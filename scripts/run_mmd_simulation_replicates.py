@@ -12,7 +12,7 @@ sys.path.append("../scripts")
 
 import tensorflow_probability.python.distributions as tfd
 
-from data_loading_utils import load_Xy, read_feather, load_string_kernels
+from data_loading_utils import load_otu_table, read_feather, load_string_kernels
 from misc_utils import cluster_otus, arrayidx2args, dict_rbind, append_sim_args, uniform_zero_replacement, closure_df, clr_df
 from kernel_classes import UniFracKernel
 from mmd_utils import *
@@ -45,7 +45,6 @@ logger.info(f"N_SEED_CHUNKS={N_SEED_CHUNKS}")
 arg_vals = arrayidx2args(
     PBS_ARRAY_INDEX,
     {
-        'DATASET' : ["fame__bacterial"],
         'TRANSFORM' : ["clr", "log1p"],
         'STRING_KERNEL_VAR' : [1e-1],
         'N_TOTAL' : [50, 100, 200],
@@ -59,7 +58,7 @@ arg_vals = arrayidx2args(
 
 logger.info(arg_vals)
 
-dataset = arg_vals['DATASET']
+DATASET = 'fame__bacterial'
 TRANSFORM = arg_vals['TRANSFORM']
 STRING_KERNEL_VAR = arg_vals['STRING_KERNEL_VAR']
 N_TOTAL = arg_vals['N_TOTAL']
@@ -89,7 +88,7 @@ rng = streams[SEED_CHUNK]
 PBS_ROOT_ID = re.split("\\[|\\.", PBS_JOBID)[0]
 logger.info(f"PBS_ROOT_ID: {PBS_ROOT_ID}")
 save_path = save_path = os.path.join(
-    "../results/simulations/mmd",
+    "../results/mmd_simulations",
     PBS_ROOT_ID)
 logger.info(f"Making save directory at {save_path}")
 os.makedirs(save_path, exist_ok=True)
@@ -131,24 +130,21 @@ PHENOTYPES = {
     'Busselton' : ['Asthma', 'BMI']
 }
 
-# load OTU tables, phenotypes
-data_dict = load_Xy(
-    dataset=dataset,
-    phenotype=PHENOTYPES[re.findall("fame|CelticFire|Busselton", dataset)[0]][0],
-    permitted_values=[]
-)
+# load OTU table
+data_dict = {}
+data_dict['X'] = load_otu_table(dataset=DATASET)
 
 # tree
 tree = TreeNode.read(
-    os.path.join("../data/clean/formatted/trees", f"{dataset}.tree"),
+    os.path.join("../data/clean/formatted/trees", f"{DATASET}.tree"),
     'newick',
     convert_underscores=False
 )
 data_dict['tree'] = tree
-data_dict['tree_dist'] = read_feather(os.path.join("../data/clean/formatted/tree_distances", f"{dataset}.feather"))
+data_dict['tree_dist'] = read_feather(os.path.join("../data/clean/formatted/tree_distances", f"{DATASET}.feather"))
 
 # DMN concentrations
-dmn_alphas = pd.read_csv(os.path.join("../data/clean/formatted/dmn_fits", f"alphas_{dataset}.csv"))
+dmn_alphas = pd.read_csv(os.path.join("../data/clean/formatted/dmn_fits", f"alphas_{DATASET}.csv"))
 data_dict["alpha_mle"] = dmn_alphas
 
 # standardise OTU names
@@ -178,7 +174,7 @@ kernel_dict = {
 
 # string kernels
 string_kernels = load_string_kernels(
-    dataset,
+    DATASET,
     save_path="../data/clean/formatted/pre_computed_K_timings_test"
 )
 string_kernels = pd.concat(

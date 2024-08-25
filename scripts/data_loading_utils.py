@@ -1,12 +1,11 @@
-############################################################################################
-# data loading utility functions
-############################################################################################
-
+"""
+This module contains utility functions to load the required data (e.g. OTU tables, Q matrices for
+string kernels).
+"""
 import os
 import pandas as pd
-import numpy as np
 import datatable as dt
-import re
+from pathlib import Path
 
 import logging
 logging.basicConfig(
@@ -15,7 +14,18 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-def read_feather(filepath):
+def read_feather(filepath: Path) -> pd.DataFrame:
+    """Read a feather file.
+
+    The feather file must have been saved with a column named 'rownames'
+    or 'C0' (from datatable). This column will be set as the row index.
+    
+    Args:
+        filepath: path to feather file.
+
+    Returns:
+        pd.DataFrame.
+    """
     out = pd.read_feather(filepath)
     if "rownames" in out:
         return out.set_index("rownames")
@@ -23,123 +33,43 @@ def read_feather(filepath):
         logger.warning("'rownames' not available for use as index")
         return out.set_index("C0")
 
-def load_Xy(dataset=None, phenotype=None, permitted_values=[], load_path=None, n_threads=1):
-    
-    logger.debug(f"dataset: {dataset}, phenotype: {phenotype}")
+def load_otu_table(dataset, n_threads=1):
+    """Load the OTU table for a given dataset.
 
-    if load_path is None: # real dataset
+    OTUs with zero counts are removed.
 
-        logger.debug("Loading real dataset")
-        if phenotype is None or dataset is None:
-            raise ValueError("Must specify phenotype and dataset for a real dataset")
-    
-        # load OTU abundances
-        x = dt.fread(
-            "../data/clean/formatted/X/{}.csv".format(dataset),
-            nthreads=n_threads
-        ).to_pandas()
-        x.C0 = x.C0.astype(str)
-        x = x.set_index("C0")
-        x.index.rename("sample_id", inplace=True)
-        x = x.iloc[:].astype(int) # datatable converts binary columns to boolean for some reason
-        logger.debug("Loaded x with shape {}".format(x.shape))
-        
-        # load phenotype
-        if "fame" in dataset:
-            study = "fame"
-        elif "Busselton" or "CelticFire" in dataset:
-            study = "buscf"
-        else:
-            raise ValueError("Can't get study for dataset {}".format(dataset))
-        logger.debug("Study = {}".format(study))
-        
-        y = pd.read_csv("../data/clean/formatted/y/{}.csv".format(study))
-        
-        
-        # multiple phenotypes
-        if isinstance(phenotype, list):
-            if not all([pheno in y for pheno in phenotype]):
-                raise ValueError("Some phenotypes missing")
-            y = y[["sample_id"] + phenotype].set_index("sample_id")
-        else: # single phenotype
-            if phenotype not in y:
-                raise ValueError("{} not in y".format(phenotype))
-            y = y[["sample_id", phenotype]].set_index("sample_id")
-        logger.debug("Loaded y with shape {}".format(y.shape))
-        
-        if len(permitted_values)>0:
-            logger.debug(f"Subsetting to {permitted_values}")
-            y = y.loc[ y[phenotype].isin(permitted_values) ]
-        
-        otu_info = None
+    Args:
+        dataset: name of dataset.
+        n_threads: number of threads to use in datatable.fread.
 
-    else: # simulated dataset - also returns otu effect sizes
-
-        logger.debug("Loading simulated dataset")
-
-        x = read_feather(os.path.join(load_path, "Z.feather"))
-        y = read_feather(os.path.join(load_path, "y.feather"))
-        logger.debug("Loaded x with shape {}".format(x.shape))
-        logger.debug("Loaded y with shape {}".format(y.shape))
-        otu_info = read_feather(os.path.join(load_path, "otu_summary.feather"))
-    
-    # merge on samples (those with abundance data and non-NA phenotype)
-    y_samples = y.dropna().index
-    x_samples = x.index
-    common_samples = np.intersect1d(x_samples, y_samples)
-    logger.debug("{} samples in both X and y".format(len(common_samples)))
+    Returns:
+        pd.DataFrame: the OTU abundances (counts).
+    """
+    # load OTU abundances
+    x = dt.fread(
+        f"../data/clean/formatted/X/{dataset}.csv",
+        nthreads=n_threads
+    ).to_pandas()
+    x.C0 = x.C0.astype(str)
+    x = x.set_index("C0")
+    x.index.rename("sample_id", inplace=True)
+    x = x.iloc[:].astype(int) # datatable converts binary columns to boolean for some reason
+    logger.debug("Loaded x with shape {}".format(x.shape))
     
     # remove OTUs that are all zero
     x = x.loc[:, (x != 0).any(axis=0)]
-        
-    y = y.reindex(common_samples)
-    x = x.reindex(common_samples)
-    logger.debug("x.shape={}, y.shape={}".format(x.shape, y.shape))
 
-    # check samples all match and that there are no NAs
-    assert x.index.equals(y.index)
+    # check there are no NAs
     assert pd.isna(x).sum().sum()==0
-    assert pd.isna(y).sum().sum()==0
     
-    return {'X' : x, 'y' : y, 'otu_info' : otu_info}
-
-def load_unifrac_kernel(dataset, weighted=True, load_path=None, n_threads=1):
-    # Load UniFrac kernel matrix
-    try:
-        if load_path is None:
-            logger.debug("Loading {}weighted unifrac kernel for a real dataset".format(
-                "" if weighted else "un"
-            ))
-            kernel_path = "../data/clean/formatted/pre_computed_K/{}weighted_unifrac_{}.csv".format(
-                    "" if weighted else "un", dataset)
-            logger.debug(f"Loading kernel from {kernel_path}")
-            Kxx = dt.fread(
-                kernel_path,
-                header=True,
-                nthreads=n_threads
-            ).to_pandas()
-            Kxx.C0 = Kxx.C0.astype(str)
-            Kxx = Kxx.set_index("C0")
-            Kxx.index.rename("sample_id", inplace=True)
-        else:
-            logger.debug("Loading unifrac kernel for a simulated dataset")
-            Kxx = read_feather(os.path.join(dataset, "{}weighted_unifrac.feather".format("" if weighted else "un")))
-
-        logger.debug("Loaded Kxx with shape {}".format(Kxx.shape))
-        assert Kxx.index.equals(Kxx.columns)
-        assert pd.isna(Kxx).sum().sum()==0
-        
-    except ValueError:
-        logger.warning(f"No pre-computed unifrac found for {dataset}")
-    
-    return Kxx
+    return x.sort_index()
 
 def parse_stringkernel_name(x):
     return dict([xx.split("__", 1) for xx in x.replace(".feather", "").replace("fame__", "fame_").split("____")]) 
 
-def load_string_kernels(base_dataset, substring_lengths=[], save_path="../data/clean/formatted/pre_computed_K"):
+def load_string_kernels(base_dataset, save_path="../data/clean/formatted/pre_computed_K"):
     
-    logger.debug(f"Loading spectrum kernels for {base_dataset}")
+    logger.debug(f"Loading string kernels for {base_dataset}")
     
     if "CelticFire" in base_dataset or "Busselton" in base_dataset:
         file_key = "buscf"
