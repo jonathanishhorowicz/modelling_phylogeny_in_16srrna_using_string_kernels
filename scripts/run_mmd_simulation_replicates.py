@@ -47,12 +47,10 @@ arg_vals = arrayidx2args(
     {
         'TRANSFORM' : ["clr", "log1p"],
         'STRING_KERNEL_VAR' : [1e-1],
-        'N_TOTAL' : [50, 100, 200],
+        'N_TOTAL' : [50, 100, 200, 400],
         'GROUP1_SIZE' : [0.5],
         'SAMPLE_READ_DISP' : [3.0, 10.0, 30.0],
         'SEED_CHUNK' : range(N_SEED_CHUNKS)
-        # 'CANDIDATE_EPS' : [-0.1, 1e-3, 1e-2, 1e-1, 1.1]
-        
     }
 )
 
@@ -63,7 +61,6 @@ TRANSFORM = arg_vals['TRANSFORM']
 STRING_KERNEL_VAR = arg_vals['STRING_KERNEL_VAR']
 N_TOTAL = arg_vals['N_TOTAL']
 GROUP1_SIZE = arg_vals['GROUP1_SIZE']
-# CANDIDATE_EPS = arg_vals['CANDIDATE_EPS']
 SAMPLE_READ_DISP = arg_vals['SAMPLE_READ_DISP']
 SEED_CHUNK = arg_vals['SEED_CHUNK']
 
@@ -77,7 +74,6 @@ n_dmn_resamples = 1
 
 # setup RNGs
 SEED = 12345
-
 ss = np.random.SeedSequence(SEED)
 
 child_seeds = ss.spawn(N_SEED_CHUNKS)
@@ -99,14 +95,15 @@ os.makedirs(os.path.join(save_path, "sampled_alphas"), exist_ok=True)
 
 # save settings
 settings = {
-    'SAMPLE_READ_MEAN' : SAMPLE_READ_MEAN,
-    'n0' : n[0],
-    'n1' : n[1],
-    'N_REPLICATES' : N_REPLICATES,
-    'n_mmd_permutations' : n_mmd_permutations,
-    'n_eps_permutations' : n_eps_permutations,
-    'n_dmn_resamples' : n_dmn_resamples,
-    'SEED' : [SEED]
+    'DATASET': DATASET,
+    'SAMPLE_READ_MEAN': SAMPLE_READ_MEAN,
+    'n0': n[0],
+    'n1': n[1],
+    'N_REPLICATES': N_REPLICATES,
+    'n_mmd_permutations': n_mmd_permutations,
+    'n_eps_permutations': n_eps_permutations,
+    'n_dmn_resamples': n_dmn_resamples,
+    'SEED': [SEED]
 }
 pd.DataFrame(
     dict(
@@ -123,12 +120,6 @@ pd.DataFrame(
 #################################################################################################################
 # Setup
 #################################################################################################################
-
-PHENOTYPES = {
-    'fame' : ['Disease', 'Group', 'Exacing'],
-    'CelticFire' : ['Asthma', 'BMI'],
-    'Busselton' : ['Asthma', 'BMI']
-}
 
 # load OTU table
 data_dict = {}
@@ -165,8 +156,6 @@ data_dict['alpha_mle'] = data_dict['alpha_mle'].sort_values("OTU").reset_index(d
 
 # kernels
 kernel_dict = {
-#     'rbf' : lambda x0,x1: make_rbf_kernel_fn(x0, x1, False),
-#     'matern32' : lambda x0,x1: make_matern32_kernel_fn(x0, x1, False),
     'rbf-rescale' : lambda x0,x1: make_rbf_kernel_fn(x0, x1, True),
     'matern32-rescale' : lambda x0,x1: make_matern32_kernel_fn(x0, x1, True),
     'gram' : make_gram_kernel_fn
@@ -207,11 +196,9 @@ kernel_dict["weighted-unifrac"] = lambda x0,x1: UniFracKernel(data_dict['tree'],
 #################################################################################################################
 
 ################################################################################################################
-# Run experiments
+# Run replicates
 ################################################################################################################
 
-all_alphas = {}
-all_counts = {}
 all_mmd_results = {}
 
 for alpha_rep_idx in range(N_REPLICATES):
@@ -268,9 +255,8 @@ for alpha_rep_idx in range(N_REPLICATES):
                             columns=alpha.otu
                         )
                     )
-                # all_counts[(alpha_rep_idx, spec, dmn_rep)] = sampled_counts
 
-                # check otu names match
+                # check otu names match across tree, OTU table and string kernel Q matrices
                 for x in sampled_counts:
                     assert np.array_equal(x.columns, otu_names)
                     assert x.columns.equals(data_dict["tree_dist"].columns)
@@ -283,9 +269,9 @@ for alpha_rep_idx in range(N_REPLICATES):
                 for kernel_name, kernel_maker in kernel_dict.items():
                     logger.debug(f"kernel: {kernel_name}")
                     
-                    if TRANSFORM=="log1p":
+                    if TRANSFORM == "log1p":
                         counts = [np.log(x+1.0) for x in sampled_counts]
-                    elif TRANSFORM=="clr":
+                    elif TRANSFORM == "clr":
                         counts = [closure_df(x) for x in sampled_counts]
                         counts = [uniform_zero_replacement(x, rng) for x in counts]
                         counts = [clr_df(x) for x in counts]
@@ -299,20 +285,9 @@ for alpha_rep_idx in range(N_REPLICATES):
                         rng
                     )
 
-                    # mmd_result = eps_perm_test(
-                    #     *counts,
-                    #     kernel_maker,
-                    #     data_dict['tree_dist'],
-                    #     CANDIDATE_EPS,
-                    #     n_eps_permutations,
-                    #     n_mmd_permutations,
-                    #     rng
-                    # )
-
                     all_mmd_results[(
                         spec, kernel_name, alpha_rep_idx, eps, dmn_rep
                     )] = mmd_result
-        all_alphas[(alpha_rep_idx, eps)] = alpha2
 
 ################################################################################################################
 ################################################################################################################
@@ -324,46 +299,24 @@ for alpha_rep_idx in range(N_REPLICATES):
 #
 # format all the results
 mmd_df = {}
-mmd_null = {}
 
-for k,v in all_mmd_results.items():
+for k, v in all_mmd_results.items():
     mmd_perm_vals, mmd_obs, p_value = v
     mmd_df[k] = pd.DataFrame(
         {'mmd_emp' : [mmd_obs], 'p_value' : [p_value]}
     )
-#     mmd_null[k] = pd.DataFrame(
-#         {'mmd_null' : mmd_perm_vals}
-#     )
 
 # Empirical MMD and p-value
 all_mmd_df = dict_rbind(mmd_df, ["otu_perm_method", "kernel", "alpha_rep", "eps"])
-
-# Permutation MMD values (null)
-# all_null_mmd_df = dict_rbind(mmd_null, ["otu_perm_method", "kernel", "alpha_rep", "eps"])
-
-# # Sampled concentrations for DMNs
-# all_alphas = dict_rbind(
-#     all_alphas,
-#     ["alpha_rep", "eps"]
-# )
 
 # save results to disc
 append_sim_args(
     all_mmd_df,
     arg_vals
-).to_csv(os.path.join(save_path, "mmd_and_pvalues", f"{PBS_JOBID}.csv"),
-        index=False)
-
-# if n_mmd_permutations <= 100:
-#     append_sim_args(
-#         all_null_mmd_df,
-#         arg_vals
-#     ).to_feather(os.path.join(save_path, "permuted_mmds", f"{PBS_JOBID}.feather"))
-
-# append_sim_args(
-#     all_alphas,
-#     arg_vals
-# ).to_feather(os.path.join(save_path, "sampled_alphas", f"{PBS_JOBID}.feather"))
+).to_csv(
+    os.path.join(save_path, "mmd_and_pvalues", f"{PBS_JOBID}.csv"),
+    index=False
+)
 
 logger.info("Script finished successfully")
 
