@@ -1,17 +1,21 @@
+"""
+This script runs the replicates for a single data point of Figures 7 and 8.
+
+Each data point is a single value of 
+- transformation function (centre log ratio or log(x+1))
+- total number of patients
+- negative bionomial dispersion parameter 
+"""
 import numpy as np
 import pandas as pd
-
-from skbio import TreeNode
-
 import re
-
-import os, sys
-
-from kernel_classes import UniFracKernel
-sys.path.append("../scripts")
+import os
+import sys
+from skbio import TreeNode
 
 import tensorflow_probability.python.distributions as tfd
 
+sys.path.append("../scripts")
 from data_loading_utils import load_otu_table, read_feather, load_string_kernels
 from misc_utils import cluster_otus, arrayidx2args, dict_rbind, append_sim_args, uniform_zero_replacement, closure_df, clr_df
 from kernel_classes import UniFracKernel
@@ -46,9 +50,7 @@ arg_vals = arrayidx2args(
     PBS_ARRAY_INDEX,
     {
         'TRANSFORM' : ["clr", "log1p"],
-        'STRING_KERNEL_VAR' : [1e-1],
         'N_TOTAL' : [50, 100, 200, 400],
-        'GROUP1_SIZE' : [0.5],
         'SAMPLE_READ_DISP' : [3.0, 10.0, 30.0],
         'SEED_CHUNK' : range(N_SEED_CHUNKS)
     }
@@ -63,11 +65,14 @@ N_TOTAL = arg_vals['N_TOTAL']
 GROUP1_SIZE = arg_vals['GROUP1_SIZE']
 SAMPLE_READ_DISP = arg_vals['SAMPLE_READ_DISP']
 SEED_CHUNK = arg_vals['SEED_CHUNK']
+STRING_KERNEL_VAR = 1e-1
+GROUP1_SIZE = 0.5
 
 n = [int(x) for x in [N_TOTAL*GROUP1_SIZE, N_TOTAL*(1.0-GROUP1_SIZE)]]
 
 SAMPLE_READ_MEAN = int(1e5)
 
+EPS_GRID = [-0.1, 1e-2, 1e-1, 1.1]
 n_mmd_permutations = 100 # MMD permutation test
 n_eps_permutations = 20
 n_dmn_resamples = 1
@@ -155,6 +160,8 @@ data_dict["alpha_mle"].OTU = data_dict["alpha_mle"].OTU.str.replace("\\[|\\]", "
 data_dict['alpha_mle'] = data_dict['alpha_mle'].sort_values("OTU").reset_index(drop=True)
 
 # kernels
+# - each kernel is a callable that takes two OTU tables (shape (n1,p) and (n2,p)) and returns
+# - n1 x n2 kernel matrix of sample-wise similatiries
 kernel_dict = {
     'rbf-rescale' : lambda x0,x1: make_rbf_kernel_fn(x0, x1, True),
     'matern32-rescale' : lambda x0,x1: make_matern32_kernel_fn(x0, x1, True),
@@ -209,7 +216,7 @@ for alpha_rep_idx in range(N_REPLICATES):
     alpha["alpha_i"] = rng.permutation(alpha.alpha)
     alpha = alpha.drop(columns="alpha").rename(columns={"OTU" : "otu"})
 
-    for eps in [-0.1, 1e-2, 1e-1, 1.1]:
+    for eps in EPS_GRID:
         logger.info(f"eps={eps}")
 
         alpha2 = alpha.merge(
