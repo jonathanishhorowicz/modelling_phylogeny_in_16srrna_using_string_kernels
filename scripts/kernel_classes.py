@@ -1,16 +1,14 @@
+"""
+This module contains subclasses of gpflow.kernels.Kernel that are
+used in the GP simulations.
+"""
 import numpy as np
+from skbio.diversity import beta_diversity
 
+import tensorflow as tf
 import gpflow as gpf
 from gpflow.kernels import Kernel
 from gpflow.utilities import positive
-
-import tensorflow as tf
-
-from skbio.diversity import beta_diversity
-
-import sys
-sys.path.append("../scripts")
-from misc_utils import isPD, nearestPD
 
 import logging
 logging.basicConfig(
@@ -20,30 +18,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class StringKernel(Kernel):
-    #
-    # TODO: presence/abscence instead of OTU abundances
-    # for debugging but might work better
-    # Can also simulate y from a GP with the given kernel to 
-    # see if it's possible to recover the signal
-    def __init__(self, Q, variance=1e-2, variance_lowerlim=0.0, forceQPD=False):
+    def __init__(self, Q, variance=1e-2, variance_lowerlim=0.0):
         logger.debug(f"Initialising SpectrumKern with Q shape {Q.shape}")
         super().__init__()
-        self._Q = Q.copy() # OTU-wise similarity, p x p
-        self.forceQPD = forceQPD
-        if not isPD(self._Q):
-            # logger.warning("StringKernel Q is not PD")
-            if self.forceQPD:
-                logger.warning("Forcing String Q to be PD")
-                self._Q = nearestPD(self._Q)
-            
+        self._Q = Q.copy()
         self.variance = gpf.Parameter(variance, transform=positive(variance_lowerlim))
-        
+
+    @property
+    def Q(self):
+        """OTU-wise similarity matrix, shape p x p."""
+        return self._Q
+
     def K(self, X, X2=None):
         if X2 is None:
             X2 = X
-        logger.debug(f"X shape is {X.shape}, X2 shape is {X2.shape}, _Q shape is {self._Q.shape}")
-        out = tf.linalg.matmul(tf.linalg.matmul(X, self._Q), tf.transpose(X2))
-        logger.debug(f"output has shape {out.shape}")
+        out = tf.linalg.matmul(tf.linalg.matmul(X, self.Q), tf.transpose(X2))
         return out * self.variance
     
     def K_diag(self, X):
@@ -61,10 +50,7 @@ class UniFracKernel(Kernel):
         self.variance = gpf.Parameter(variance, transform=positive())
             
     def K(self, X, X2=None):
-        
-#         if X.shape[1]!=len(self.otu_names):
-#             raise ValueError(f"Number of OTUs in X ({X.shape[1]}) does not match tree ({len(self.otu_names)})")
-        
+                
         if X2 is not None:
             XX = np.concatenate([X, X2], axis=0)
         else:
