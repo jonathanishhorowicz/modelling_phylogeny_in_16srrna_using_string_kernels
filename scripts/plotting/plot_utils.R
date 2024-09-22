@@ -1,15 +1,11 @@
 library(ggplot2)
 theme_set(theme_linedraw(base_size=12))
-library(RColorBrewer)
-
-####################################################################################
-# utility functions for plots
-####################################################################################
-
+library(knitr)
 
 cropped_ggsave <- function(save_path, plot=last_plot(), ...) {
+  # save a plot then remove any surrounding whitespace
   ggsave(save_path, plot=plot, ...)
-  knitr::plot_crop(save_path)
+  plot_crop(save_path)
 }
 
 get_plot_theme <- function() {
@@ -27,5 +23,15 @@ get_plot_theme <- function() {
   )
 }
 
-####################################################################################
-####################################################################################
+equalise_x_and_y_limits <- function(plt) {
+  # set x and y to same limits and aspect ratio to 1
+  y_limits <- layer_scales(plt)$y$range$range
+  x_limits <- layer_scales(plt)$x$range$range
+  lower_lim <- c(min(x_limits[[1]], y_limits[[1]]))
+  upper_lim <- c(max(x_limits[[2]], y_limits[[2]]))
+  plt <- plt +
+    xlim(c(lower_lim, upper_lim)) +
+    ylim(c(lower_lim, upper_lim)) +
+    coord_fixed()
+  return(plt)
+}

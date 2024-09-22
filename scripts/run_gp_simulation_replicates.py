@@ -60,12 +60,9 @@ arg_vals = arrayidx2args(
     PBS_ARRAY_INDEX,
     {
         'RESAMPLE_BATCH_INDEX' : range(N_REP_BATCHES),
-        'PERMUTE_X_OTUS' : [True],
         'SIGMA_SQ' :  {'classification': [0.1], 'regression': [0.3, 0.6]}[TASK],
-        'TEST_SIZE' : [0.2],
         'N_SAMPLES' : [200, 400],
-        'SAMPLE_READ_DISP' : [3, 10, 30],
-        'TRANSFORM' : ['rel_abund']
+        'SAMPLE_READ_DISP' : [3, 10, 30]
     }
 )
 
@@ -73,12 +70,10 @@ logger.info(arg_vals)
 
 DATASET = 'fame__bacterial'
 RESAMPLE_BATCH_INDEX = arg_vals['RESAMPLE_BATCH_INDEX']
-PERMUTE_X_OTUS = arg_vals['PERMUTE_X_OTUS']
 SIGMA_SQ = arg_vals['SIGMA_SQ']
-TEST_SIZE = arg_vals['TEST_SIZE']
 N_SAMPLES = arg_vals['N_SAMPLES']
 SAMPLE_READ_DISP = arg_vals['SAMPLE_READ_DISP']
-TRANSFORM = arg_vals['TRANSFORM']
+
 
 # phenotype simulation settings
 N_CAUSAL_CLUSTERS = 10
@@ -92,6 +87,8 @@ SIGNAL_VAR_STARTING_GUESS = 1.0
 OPT = True
 
 SAMPLE_READ_MEAN = int(1e5)
+TRANSFORM = 'rel_abund'
+TEST_SIZE = 0.2
 
 SEED = 124356
 
@@ -100,8 +97,9 @@ PBS_ROOT_ID = re.split("\\[|\\.", PBS_JOBID)[0]
 logger.info(f"PBS_ROOT_ID: {PBS_ROOT_ID}")
 save_path = save_path = os.path.join(
     "../results/gp_simulations",
-    TASK,
-    PBS_ROOT_ID)
+    PBS_ROOT_ID,
+    TASK
+)
 logger.info(f"Making save directory at {save_path}")
 os.makedirs(save_path, exist_ok=True)
 os.makedirs(os.path.join(save_path, "metadata"), exist_ok=True)
@@ -114,6 +112,7 @@ os.makedirs(os.path.join(save_path, "best_string_hparams"), exist_ok=True)
 # save settings
 settings = {
     'DATASET': DATASET,
+    'TASK': TASK,
     'SAMPLE_READ_MEAN' : SAMPLE_READ_MEAN,
     'N_CAUSAL_CLUSTERS' : N_CAUSAL_CLUSTERS,
     'OPT' : OPT,
@@ -125,10 +124,9 @@ settings = {
     'EPS' : EPS,
     'SEED' : [SEED]
 }
+settings = dict(**settings, **arg_vals)
 pd.DataFrame(
-    dict(
-        **settings, **arg_vals
-    )
+    settings
 ).to_csv(
     os.path.join(save_path, "metadata", f"{PBS_JOBID}.csv"),
     index=False
@@ -273,9 +271,7 @@ def fit_generic_gpmod(X, y, kernel_maker, noise_variance, opt):
     Returns:
         Fitted model, None, None. The two Nones are to match the return
         signature of fit_string_gpmod, which returns additional information.
-    """
-    # fit a non-string GP model
-    
+    """    
     target_type = type_of_target(y)
     
     if target_type == 'continuous':
