@@ -61,7 +61,9 @@ class UniFracKernel(Kernel):
         logger.debug(f"K has shape {K.shape}")
         
         if X2 is not None:
-            K = K[np.ix_(np.arange(X.shape[0]), np.arange(X2.shape[0]))]
+            x_idxs = np.arange(X.shape[0])
+            x2_idxs = X.shape[0] + np.arange(X2.shape[0])
+            K = K[np.ix_(x_idxs, x2_idxs)]
         
         return self.variance * self._centreK(K)
     
@@ -87,33 +89,3 @@ class UniFracKernel(Kernel):
             ).data
         
         return _fn
-    
-# class UniFracKernel(Kernel):
-#     def __init__(self, K, variance, centre):
-#         super().__init__()
-#         if centre:
-#             self._K = tf.convert_to_tensor(self._centreK(K.copy().to_numpy()))
-#         else:
-#             self._K = tf.convert_to_tensor(K.copy().to_numpy())
-# #         if not isPD(self._K):
-# #             logger.warning("K is not PD")
-#         self.variance = gpf.Parameter(variance, transform=positive())
-#         self.centre = centre
-            
-#     def K(self, X, X2=None):
-        
-#         if X2 is None:
-#             X2 = X
-#         logger.debug(f"X shape is {X.shape}, X2 shape is {X2.shape}")
-#         out = tf.gather(tf.gather(self._K, tf.cast(X2, tf.int32), axis=1), tf.cast(X, tf.int32), axis=0)
-#         logger.debug(f"output has shape {out.shape}")
-#         return self.variance * out
-    
-#     def K_diag(self, X):
-#         return np.diag(self.K(X))
-    
-#     def _centreK(self, K):
-#         n = K.shape[0]
-#         one_vector = np.ones((n,1))
-#         J = np.eye(n) - 1.0/n * np.matmul(one_vector, np.transpose(one_vector))
-#         return -0.5 * np.matmul(J, np.matmul(1.0 - K, J))

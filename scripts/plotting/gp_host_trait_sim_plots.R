@@ -19,7 +19,7 @@ source("../scripts/plotting/plot_utils.R")
 # Read command line argument (path to MMD simulation results)
 args <- commandArgs(trailingOnly=TRUE)
 save_path <- args[[1]]
-cat('Reading MMD simulation results from ', save_path, '\n')
+cat('Reading GP simulation results from ', save_path, '\n')
 
 #
 # load results

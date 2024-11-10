@@ -10,6 +10,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import tensorflow as tf
+tf.compat.v1.enable_eager_execution()
 import tensorflow_probability.python.distributions as tfd
 import gpflow as gpf
 from gpflow.kernels import Linear, RBF, Matern32
@@ -37,7 +38,6 @@ logging.getLogger("utils").setLevel('INFO')
 #######################################################################################################################
 # setup
 #######################################################################################################################
-
 
 #
 # read environment variables
@@ -73,7 +73,6 @@ RESAMPLE_BATCH_INDEX = arg_vals['RESAMPLE_BATCH_INDEX']
 SIGMA_SQ = arg_vals['SIGMA_SQ']
 N_SAMPLES = arg_vals['N_SAMPLES']
 SAMPLE_READ_DISP = arg_vals['SAMPLE_READ_DISP']
-
 
 # phenotype simulation settings
 N_CAUSAL_CLUSTERS = 10
@@ -379,13 +378,13 @@ def fit_string_gpmod(
     return m, lml_df.drop(columns="Q"), best_row.kernel_name
 
 model_fit_fns = {
-    'linear' : lambda X,y: fit_generic_gpmod(
+    'linear': lambda X,y: fit_generic_gpmod(
         X, y,
         lambda: Linear(variance=SIGNAL_VAR_STARTING_GUESS),
         NOISE_VAR_STARTING_GUESS,
         OPT
     ),
-    'rbf' : lambda X,y: fit_generic_gpmod(
+    'rbf': lambda X,y: fit_generic_gpmod(
         X, y,
         lambda: RBF(
             variance=SIGNAL_VAR_STARTING_GUESS,
@@ -394,7 +393,7 @@ model_fit_fns = {
         NOISE_VAR_STARTING_GUESS,
         OPT
     ),
-    'matern32' : lambda X,y: fit_generic_gpmod(
+    'matern32': lambda X,y: fit_generic_gpmod(
         X, y,
         lambda: Matern32(
             variance=SIGNAL_VAR_STARTING_GUESS,
@@ -403,7 +402,7 @@ model_fit_fns = {
         NOISE_VAR_STARTING_GUESS,
         OPT
     ),
-    'string' : lambda X,y: fit_string_gpmod(
+    'string': lambda X,y: fit_string_gpmod(
         X, y,
         SIGNAL_VAR_STARTING_GUESS,
         NOISE_VAR_STARTING_GUESS,
