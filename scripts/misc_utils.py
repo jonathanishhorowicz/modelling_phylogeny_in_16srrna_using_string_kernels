@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import gpflow as gpf
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import linkage, fcluster
@@ -18,11 +17,16 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-############################################################################################
-# Misc functions
-############################################################################################
-
 def closure_df(df) -> pd.DataFrame:
+    """Apply the closure transformation (i.e. make all samples sum to 1) and return
+    the result as a pd.DataFrame.
+    
+    Args:
+        df: dataframe of OTU abundances (counts).
+
+    Returns:
+        pd.DataFrame: relative abundances.
+    """
     return pd.DataFrame(
         closure(df),
         columns=df.columns,
@@ -30,28 +34,45 @@ def closure_df(df) -> pd.DataFrame:
     )
 
 
-def clr_df(x):
+def clr_df(df):
+    """Apply the CLR transformation (centre log-ratio) and return the result as 
+    a pd.DataFrame.
+    
+    Args:
+        df: result of applying closure to OTU counts.
+
+    Returns:
+        pd.DataFrame: CLR-transformed counts.
+    """
     return pd.DataFrame(
-        clr(x),
-        columns=x.columns,
-        index=x.index
+        clr(df),
+        columns=df.columns,
+        index=df.index
     )
 
-def uniform_zero_replacement(x, rng, dl=1.0):
-    # detection limit is smallest positive count
-    # dl = np.nanmin(np.where(x > 0, x, np.nan))
-    
-    # https://www.sciencedirect.com/science/article/pii/S0169743921000162#bib8
-    # Table 1: runif(0.1∗DL,DL)
-    
-    replacements = rng.uniform(low=0.1*dl, high=dl, size=x.shape)
-    imputed_x = pd.DataFrame(
-        np.where(x>0.0, x, replacements),
-        columns=x.columns,
-        index=x.index
+def uniform_zero_replacement(df, rng, dl=1.0):
+    """Replace zeroes using the uniform zero placement rule, with the detection 
+    limit is the smallest positive count.
+
+    See Table 1 (runif(0.1∗DL,DL)) iin
+    https://www.sciencedirect.com/science/article/pii/S0169743921000162#bib8
+
+    Args:
+        df: OTU counts.
+        rng: numpy RNG.
+        dl: lower detection limit.
+
+    Returns:
+        pd.DataFrame: counts with zeroes replaced.
+    """
+    replacements = rng.uniform(low=0.1*dl, high=dl, size=df.shape)
+    df_imputed = pd.DataFrame(
+        np.where(df>0.0, df, replacements),
+        columns=df.columns,
+        index=df.index
     )
     
-    return imputed_x
+    return df_imputed
 
 def dict_rbind(df, new_names):
     out_df = pd.concat(df).reset_index()
@@ -64,9 +85,21 @@ def dict_rbind(df, new_names):
     return out_df
 
 def append_sim_args(df, arg_dict):
+    """Add a dictionary of scalars to a DatFrame.
+    
+    Each key is a new column containing the scalar value.
+
+    Args:
+        df: dataframe of simulation results.
+        arg_dict: dictionary of simulation settings.
+
+    Returns:
+        pd.DataFrame: simulation results with new columns with the simulation
+        settings.
+    """
     return pd.concat([df, pd.DataFrame(arg_dict, index=df.index)], axis=1)
 
-def arrayidx2args(idx, arg_dict) -> Dict:
+def arrayidx2args(idx, arg_dict: Dict) -> Dict:
     
     arg_dict_lengths = {k : len(v) for k,v in arg_dict.items()}
     
@@ -82,10 +115,20 @@ def arrayidx2args(idx, arg_dict) -> Dict:
     return arg_dict
 
 def median_heuristic(x):
+    """Calculate the median heuristic estimate of the lengthscale for an RBF kernel.
+    
+    See Garreau et al. (2018) for discussion of the median heuristic.
+
+    Args:
+        X: design matrix.
+
+    Returns:
+        float: estimate of the median heuristic.
+    """
     return np.median(pdist(x, metric="sqeuclidean"))
 
 def optimise_gpr(model):
-    logger.debug("Optimising model")
+    """Optimise a GP model using the L-BFGS."""
     gpf.optimizers.Scipy().minimize(model.training_loss, variables=model.trainable_variables)
 
 def cluster_otus(tree_distances, dist_eps):
@@ -131,64 +174,32 @@ def safe_rescale(train_arr, test_arr=None):
         test_arr_ = pd.DataFrame(test_arr_, columns=test_arr.columns, index=test_arr.index)
     
     return train_arr_, test_arr_
-    
-############################################################################################
-############################################################################################
 
-############################################################################################
-# Kernel Linear algebra
-############################################################################################
+def convert_nb_params(mu, size):
+    """Convert the mu (mean) and size parameters of a negative binomial to the 
+    n,p parameters.
 
-def isPD(B):
-    """Returns true when input is positive-definite, via Cholesky"""
-    try:
-        _ = np.linalg.cholesky(B)
-        return True
-    except np.linalg.LinAlgError:
-        return False
+    Args:
+        mu: mean parameter
+        size: size parameter
 
-def nearestPD(A):
-    """Find the nearest positive-definite matrix to input
-
-    A Python/Numpy port of John D'Errico's `nearestSPD` MATLAB code [1], which
-    credits [2].
-
-    [1] https://www.mathworks.com/matlabcentral/fileexchange/42885-nearestspd
-
-    [2] N.J. Higham, "Computing a nearest symmetric positive semidefinite
-    matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
+    Returns:
+        n (number of observations) and p (probability)
     """
+    p = size / (size + mu)
+    n = p*mu / (1.0 - p)
+    return n, p
 
-    B = (A + A.T) / 2
-    _, s, V = np.linalg.svd(B)
-
-    H = np.dot(V.T, np.dot(np.diag(s), V))
-
-    A2 = (B + H) / 2
-
-    A3 = (A2 + A2.T) / 2
-
-    if isPD(A3):
-        return A3
-
-    spacing = np.spacing(np.linalg.norm(A))
-    # The above is different from [1]. It appears that MATLAB's `chol` Cholesky
-    # decomposition will accept matrixes with exactly 0-eigenvalue, whereas
-    # Numpy's will not. So where [1] uses `eps(mineig)` (where `eps` is Matlab
-    # for `np.spacing`), we use the above definition. CAVEAT: our `spacing`
-    # will be much larger than [1]'s `eps(mineig)`, since `mineig` is usually on
-    # the order of 1e-16, and `eps(1e-16)` is on the order of 1e-34, whereas
-    # `spacing` will, for Gaussian random matrixes of small dimension, be on
-    # othe order of 1e-16. In practice, both ways converge, as the unit test
-    # below suggests.
-    I = np.eye(A.shape[0])
-    k = 1
-    while not isPD(A3):
-        mineig = np.min(np.real(np.linalg.eigvals(A3)))
-        A3 += I * (-mineig * k**2 + spacing)
-        k += 1
-
-    return A3
-
-############################################################################################
-############################################################################################
+def rnegbinom(n_samples, mu, size, rng):
+    """Sample from a negative binomial using the alternative (ecology) parameterisation.
+    
+    Args:
+        n_samples: number of samples
+        mu: negative binomial mean parameter
+        size: negative binomial size parameter
+        rng: numpy pRNG generator
+    
+    Returns:
+        n_samples from NB(mu, size).
+    """
+    return rng.negative_binomial(*convert_nb_params(mu, size), size=n_samples)
