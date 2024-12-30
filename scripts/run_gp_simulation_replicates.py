@@ -87,7 +87,6 @@ OPT = True
 
 SAMPLE_READ_MEAN = int(1e5)
 TEST_SIZE = 0.2
-
 SEED = 124356
 
 # create save dirs
