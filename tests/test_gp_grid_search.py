@@ -12,21 +12,6 @@ if SCRIPTS_PATH not in sys.path:
     sys.path.append(str(SCRIPTS_PATH))
 from gp_utils import hparam_grid_search
 
-# @pytest.fixture
-# def scripts_path():
-#     return (Path(__file__).parent.parent / 'scripts').resolve()
-
-# @pytest.fixture(autouse=True)
-# def add_scripts_to_path(scripts_path):
-#     pytest.set_trace()
-#     sys.path.append(str(scripts_path))
-#     yield
-#     sys.path.remove(str(scripts_path))
-
-# @pytest.fixture(autouse=True)
-# def import_gp_utils(add_scripts_to_path):
-#     from gp_utils import hparam_grid_search
-
 @pytest.fixture
 def dummy_regression_dataset():
     X, y = load_diabetes(return_X_y=True)
@@ -54,9 +39,6 @@ def fit_function_factory(**kwargs):
         )
     
     return _fit_fn
-
-
-
 
 def test_hparam_grid_search(dummy_regression_dataset, param_values):
     hparam_grid_search(dummy_regression_dataset, fit_function_factory, param_values)

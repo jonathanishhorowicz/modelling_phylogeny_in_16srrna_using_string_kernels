@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-export PBS_JOBID_ROOT=local_test
-export N_REPLICATES=3
+export PBS_JOBID_ROOT=grid_search_test
+export N_REPLICATES=1
 export N_REP_BATCHES=1
 
 export TASK='regression'

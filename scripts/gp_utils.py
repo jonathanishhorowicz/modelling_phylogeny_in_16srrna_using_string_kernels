@@ -7,15 +7,12 @@ import pandas as pd
 import logging
 logger = logging.getLogger('__name__')
 
-# def _is_montonic(vals: ArrayLike) -> bool:
-#     vals_as_series = pd.Series(vals)
-#     return vals_as_series.is_monotonic_decreasing or vals_as_series.is_monotonic_increasing
-
 def hparam_grid_search(
         data: Tuple[ArrayLike, ArrayLike],
         fit_fn_factory: Callable,
         param_values: Dict[str, ArrayLike]
     ):
+    
     X, y = data
     logger.info('Running grid search on data with {:,} samples'.format(X.shape[0]))
     param_grid = ParameterGrid(param_values)
@@ -40,8 +37,15 @@ def hparam_grid_search(
 
     # print warning if any of the optimal parameter values are at the ends of its range
     for param, range in d_param_ranges.items():
-        if np.isclose(best_params[param], range[0]) or np.isclose(best_params[param], range[1]):
-            logger.warning('Param "{}" is at the limit of its grid range'.format(param))
+        msg_template = lambda x: 'Param "{}" is at the {} limit of its grid range'.format(param, x)
+        if np.isclose(best_params[param], range[0]):
+            logger.warning(msg_template('lower'))
+        if np.isclose(best_params[param], range[1]):
+            logger.warning(msg_template('upper'))
 
     best_m = fit_fn_factory(**best_params)(X, y)
-    return best_m
+
+    df_grid_log_likelihoods = pd.DataFrame(param_grid)
+    df_grid_log_likelihoods['lml'] = obj_fun_vals
+
+    return best_m, df_grid_log_likelihoods

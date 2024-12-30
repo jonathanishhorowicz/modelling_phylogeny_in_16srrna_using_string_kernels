@@ -19,12 +19,13 @@ from gpflow.utilities import parameter_dict
 import sys
 sys.path.append("../scripts")
 from data_loading_utils import load_otu_table, load_string_kernels, read_feather
-from kernel_classes import StringKernel
+from kernel_classes import StringKernel, UniFracKernel
 from misc_utils import (
     cluster_otus, clr_df, closure_df, dict_rbind, append_sim_args,
     uniform_zero_replacement, arrayidx2args, median_heuristic,
     safe_rescale, optimise_gpr, rnegbinom
 )
+from gp_utils import hparam_grid_search
 
 import logging
 logging.basicConfig(
@@ -107,6 +108,7 @@ os.makedirs(os.path.join(save_path, "model_hyperparameters"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "model_predictions"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "string_lmls"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "best_string_hparams"), exist_ok=True)
+os.makedirs(os.path.join(save_path, "unifrac_kernel_model_selection"), exist_ok=True)
 
 # save settings
 settings = {
@@ -210,7 +212,8 @@ for i, q_old in enumerate(string_kernels.Q):
     q = q.loc[otu_names,otu_names]
     new_q.append(q)
 string_kernels.Q = new_q
-    
+
+
 #######################################################################################################################
 #######################################################################################################################
 
@@ -377,6 +380,34 @@ def fit_string_gpmod(
         
     return m, lml_df.drop(columns="Q"), best_row.kernel_name
 
+def fit_unifrac_kernel(X, y, weighted, param_grid):
+
+    def unifrac_kernel_maker_factory(signal_variance):
+        """Returns a callable that will itself return a UniFrac kernel for a set of OTUs with 
+        fixed signal variance."""
+        return lambda: UniFracKernel(data_dict['tree'], otu_names, weighted, signal_variance)
+    
+    def _fit_fn_factory(signal_variance, noise_variance):
+        """Returns a function that will fit a UniFrac kernel model with a specified
+        signal variance and noise variance."""
+
+        unifrac_kernel_maker = unifrac_kernel_maker_factory(signal_variance)
+
+        def _fit_fn(X, y):
+            """Returns a fitted UniFrac model given a signal and noise variance."""
+            return fit_generic_gpmod(X, y, unifrac_kernel_maker, noise_variance, opt=False)[0]
+        
+        return _fit_fn
+        
+    
+    grid_search_res = hparam_grid_search((X, y), _fit_fn_factory, param_grid)
+    return grid_search_res[0], grid_search_res[1], None
+
+UNIFRAC_KERNEL_PARAM_GRID = {
+    'signal_variance': np.logspace(-1, 0, 3),
+    'noise_variance': np.logspace(-1, 0, 3)
+}
+
 model_fit_fns = {
     'linear': lambda X,y: fit_generic_gpmod(
         X, y,
@@ -402,14 +433,16 @@ model_fit_fns = {
         NOISE_VAR_STARTING_GUESS,
         OPT
     ),
-    'string': lambda X,y: fit_string_gpmod(
-        X, y,
-        SIGNAL_VAR_STARTING_GUESS,
-        NOISE_VAR_STARTING_GUESS,
-        OPT,
-        string_kernels,
-        otu_names
-    )
+    # 'string': lambda X,y: fit_string_gpmod(
+    #     X, y,
+    #     SIGNAL_VAR_STARTING_GUESS,
+    #     NOISE_VAR_STARTING_GUESS,
+    #     OPT,
+    #     string_kernels,
+    #     otu_names
+    # ),
+    'unweighted-unifrac': lambda X, y: fit_unifrac_kernel(X, y, weighted=False, param_grid=UNIFRAC_KERNEL_PARAM_GRID),
+    'weighted-unifrac': lambda X, y: fit_unifrac_kernel(X, y, weighted=True, param_grid=UNIFRAC_KERNEL_PARAM_GRID)
 }
 
 #######################################################################################################################
@@ -425,6 +458,7 @@ model_hparams = {}
 string_lmls = {}
 best_string_hparams = {}
 lasso_scores = {} # for sanity check
+unifrac_grid_search_results = {}
 
 for i in range(N_REPLICATES):
     tf.keras.backend.clear_session()
@@ -585,7 +619,7 @@ for i in range(N_REPLICATES):
                 )
             except Exception as e:
                 logger.warning(f"Failed with exception:\n{e}")
-                continue
+                raise e
             
             # store relevant probability density results
             model_evals[(phylo_spec, kernel_name, i)] = evaluate_model(mod, xx_test, y_test)
@@ -596,6 +630,8 @@ for i in range(N_REPLICATES):
                 logger.info(f"best_hparams: {best_hparams}")
                 best_string_hparams[(phylo_spec, kernel_name, i)] = pd.DataFrame({'kernel_name' : best_hparams}, index=[0])
                 string_lmls[(phylo_spec, kernel_name, i)] = lml_df
+            elif 'unifrac' in kernel_name:
+                unifrac_grid_search_results[(phylo_spec, kernel_name, i)] = lml_df
             
             # save model predictions and labels
             scatterplot_data = get_scatterplot_data(
@@ -642,20 +678,26 @@ all_preds_and_labels.to_csv(
     index=False
 )
 
-all_string_lmls = dict_rbind(string_lmls, ["phylo_spec", "kernel", "rep"])
-all_string_lmls = append_sim_args(all_string_lmls, arg_vals)
-all_string_lmls.to_csv(
-    os.path.join(save_path, "string_lmls", f"{PBS_JOBID}.csv"),
+# all_string_lmls = dict_rbind(string_lmls, ["phylo_spec", "kernel", "rep"])
+# all_string_lmls = append_sim_args(all_string_lmls, arg_vals)
+# all_string_lmls.to_csv(
+#     os.path.join(save_path, "string_lmls", f"{PBS_JOBID}.csv"),
+#     index=False
+# )
+
+# all_best_string_hparams = dict_rbind(best_string_hparams, ["phylo_spec", "kernel", "rep"])
+# all_best_string_hparams = append_sim_args(all_best_string_hparams, arg_vals)
+# all_best_string_hparams.to_csv(
+#     os.path.join(save_path, "best_string_hparams", f"{PBS_JOBID}.csv"),
+#     index=False
+# )
+
+all_unifrac_grid_search_results = dict_rbind(unifrac_grid_search_results, ["phylo_spec", "kernel", "rep"])
+all_unifrac_grid_search_results = append_sim_args(all_unifrac_grid_search_results, arg_vals)
+all_unifrac_grid_search_results.to_csv(
+    os.path.join(save_path, "unifrac_kernel_model_selection", f"{PBS_JOBID}.csv"),
     index=False
 )
-
-all_best_string_hparams = dict_rbind(best_string_hparams, ["phylo_spec", "kernel", "rep"])
-all_best_string_hparams = append_sim_args(all_best_string_hparams, arg_vals)
-all_best_string_hparams.to_csv(
-    os.path.join(save_path, "best_string_hparams", f"{PBS_JOBID}.csv"),
-    index=False
-)
-
 logger.info("Script finished successfully")
 
 #######################################################################################################################
