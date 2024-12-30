@@ -74,6 +74,12 @@ Rscript ../scripts/plotting/make_mmd_plots.R path_to_mmd_sim_results
 
 ## GP simulations (Figures 7 and 8)
 
+To produce Figures 7 and 8 run
+
+```sh
+cd run
+Rscript ../scripts/plotting/gp_host_trait_sim_plots.R ../results/gp_simulations/manuscript.zip
+```
 
 
 ## Real data results (Figure 10)
