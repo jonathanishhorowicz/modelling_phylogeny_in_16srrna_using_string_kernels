@@ -13,7 +13,7 @@ import tensorflow as tf
 tf.compat.v1.enable_eager_execution()
 import tensorflow_probability.python.distributions as tfd
 import gpflow as gpf
-from gpflow.kernels import Linear, RBF, Matern32
+from gpflow.kernels import Linear
 from gpflow.utilities import parameter_dict
 
 import sys
@@ -21,8 +21,8 @@ sys.path.append("../scripts")
 from data_loading_utils import load_otu_table, load_string_kernels, read_feather
 from kernel_classes import StringKernel
 from misc_utils import (
-    cluster_otus, clr_df, closure_df, dict_rbind, append_sim_args,
-    uniform_zero_replacement, arrayidx2args, median_heuristic,
+    cluster_otus, closure_df, dict_rbind, append_sim_args,
+    arrayidx2args,
     safe_rescale, optimise_gpr, rnegbinom
 )
 
@@ -86,9 +86,7 @@ SIGNAL_VAR_STARTING_GUESS = 1.0
 OPT = True
 
 SAMPLE_READ_MEAN = int(1e5)
-TRANSFORM = 'rel_abund'
 TEST_SIZE = 0.2
-
 SEED = 124356
 
 # create save dirs
@@ -384,24 +382,6 @@ model_fit_fns = {
         NOISE_VAR_STARTING_GUESS,
         OPT
     ),
-    'rbf': lambda X,y: fit_generic_gpmod(
-        X, y,
-        lambda: RBF(
-            variance=SIGNAL_VAR_STARTING_GUESS,
-            lengthscales=median_heuristic(X)
-        ),
-        NOISE_VAR_STARTING_GUESS,
-        OPT
-    ),
-    'matern32': lambda X,y: fit_generic_gpmod(
-        X, y,
-        lambda: Matern32(
-            variance=SIGNAL_VAR_STARTING_GUESS,
-            lengthscales=median_heuristic(X)
-        ),
-        NOISE_VAR_STARTING_GUESS,
-        OPT
-    ),
     'string': lambda X,y: fit_string_gpmod(
         X, y,
         SIGNAL_VAR_STARTING_GUESS,
@@ -541,23 +521,16 @@ for i in range(N_REPLICATES):
         else:
             raise ValueError(f"Unrecognised TASK: {TASK}")
         
-        # transform X (the design matrix seen by models)
+        # transform X to relative abundance (this is the design matrix seen by models)
         XX = X.copy()
-        
-        if TRANSFORM == "clr":
-            XX = closure_df(XX)
-            XX = uniform_zero_replacement(XX, rng)
-            XX = clr_df(XX)
-        elif TRANSFORM == "rel_abund":
-            XX = closure_df(XX)
-        else:
-            raise ValueError(f"Unrecognised transform {TRANSFORM}")
+        XX = closure_df(XX)
 
         # train-test split        
         X_train, X_test, y_train, y_test = train_test_split(
             XX, y,
             test_size=TEST_SIZE,
-            stratify=y if TASK == "classification" else None)
+            stratify=y if TASK == "classification" else None
+        )
         X_train, X_test = X_train.to_numpy(), X_test.to_numpy()
 
         # rescale covariates (and labels for GP regression)
@@ -570,13 +543,8 @@ for i in range(N_REPLICATES):
         for kernel_name, kernel_fit_fn in model_fit_fns.items():
             logger.info(f"kernel_name: {kernel_name}")
             
-            # rescale X if using stationary kernel
-            if re.match("matern|rbf", kernel_name) is not None:
-                xx_train = X_train_
-                xx_test = X_test_
-            else:
-                xx_train = X_train
-                xx_test = X_test
+            xx_train = X_train
+            xx_test = X_test
                             
             # fit the model
             try: 
