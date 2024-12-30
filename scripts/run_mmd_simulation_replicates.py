@@ -17,7 +17,10 @@ import tensorflow_probability.python.distributions as tfd
 
 sys.path.append("../scripts")
 from data_loading_utils import load_otu_table, read_feather, load_string_kernels
-from misc_utils import cluster_otus, arrayidx2args, dict_rbind, append_sim_args, uniform_zero_replacement, closure_df, clr_df
+from misc_utils import (
+    rnegbinom, cluster_otus, arrayidx2args, dict_rbind,
+    append_sim_args, uniform_zero_replacement, closure_df, clr_df
+)
 from kernel_classes import UniFracKernel
 from mmd_utils import *
 
@@ -171,7 +174,7 @@ kernel_dict = {
 # string kernels
 string_kernels = load_string_kernels(
     DATASET,
-    save_path="../data/clean/formatted/pre_computed_K_timings_test"
+    save_path="../data/clean/formatted/Q_matrices_float64"
 )
 string_kernels = pd.concat(
     [string_kernels[x] for x in ["spectrum", "mismatch", "gappy"]]

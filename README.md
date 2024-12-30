@@ -50,7 +50,7 @@ export N_REPLICATES=10
 ```
 
 
-## MMD Simulations (Figures 7 and 8)
+## MMD Simulations (Figures 5 and 6)
 
 There are 24 jobs for the MMD simulations.
 
@@ -66,13 +66,15 @@ cd run
 python ../scripts/run_mmd_simulation_replicates.py 
 ```
 
-If you have all the outputs of all 24 jobs in a directory at `path_to_mmd_sim_results`, you can generate Figure 7a, 7b, 7c, 8a and 8b by running
+If you have all the outputs of all 24 jobs in a directory at `path_to_mmd_sim_results`, you can generate Figure 5a, 5b, 5c, 6a and 6b by running
 
 ```sh
 Rscript ../scripts/plotting/make_mmd_plots.R path_to_mmd_sim_results
 ```
 
-## GP simulations (Figure 9)
+## GP simulations (Figures 7 and 8)
+
+
 
 ## Real data results (Figure 10)
 
