@@ -13,7 +13,7 @@ import tensorflow as tf
 tf.compat.v1.enable_eager_execution()
 import tensorflow_probability.python.distributions as tfd
 import gpflow as gpf
-from gpflow.kernels import Linear, RBF, Matern32
+from gpflow.kernels import Linear
 from gpflow.utilities import parameter_dict
 
 import sys
@@ -21,8 +21,8 @@ sys.path.append("../scripts")
 from data_loading_utils import load_otu_table, load_string_kernels, read_feather
 from kernel_classes import StringKernel
 from misc_utils import (
-    cluster_otus, clr_df, closure_df, dict_rbind, append_sim_args,
-    uniform_zero_replacement, arrayidx2args, median_heuristic,
+    cluster_otus, closure_df, dict_rbind, append_sim_args,
+    arrayidx2args,
     safe_rescale, optimise_gpr, rnegbinom
 )
 
