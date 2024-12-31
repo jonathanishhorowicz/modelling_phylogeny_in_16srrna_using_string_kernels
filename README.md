@@ -93,3 +93,15 @@ Rscript ../scripts/plotting/gp_host_trait_sim_plots.R ../results/gp_simulations/
 
 ## Real data results (Figure 9)
 
+To run the analysis run 
+
+```sh
+cd run
+python ../scripts/run_gp_regression_ravel_dataset.py
+```
+
+Then to generate the plots run 
+
+```sh
+Rscript ...
+```
