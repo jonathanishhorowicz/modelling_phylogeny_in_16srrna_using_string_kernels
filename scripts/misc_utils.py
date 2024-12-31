@@ -203,3 +203,19 @@ def rnegbinom(n_samples, mu, size, rng):
         n_samples from NB(mu, size).
     """
     return rng.negative_binomial(*convert_nb_params(mu, size), size=n_samples)
+
+
+def remove_rare_otus(X: pd.DataFrame, cutoff: int) -> pd.DataFrame:
+    """Remove OTUs (columns) from an OTU table that are present (i.e. non-zero abundance)
+    in fewer than a given number of samples.
+    
+    Args:
+        X: OTU table where samples are on rows and taxa are on columns.
+        cutoff: minimum number of samples in which a taxa must be present to be retained.
+
+    Returns:
+        OTU table with taxa fewer in `cutoff` samples removed.
+    """
+    prevalence = np.count_nonzero(X, axis=0)
+    common_otus = X.columns[ prevalence >= cutoff ]
+    return X[common_otus]
