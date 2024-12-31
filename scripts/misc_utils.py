@@ -8,7 +8,7 @@ from skbio.stats.composition import clr, closure
 from sklearn.preprocessing import StandardScaler
 import itertools
 
-from typing import Dict
+from typing import Dict, List, Tuple
 
 import logging
 logging.basicConfig(
@@ -74,7 +74,19 @@ def uniform_zero_replacement(df, rng, dl=1.0):
     
     return df_imputed
 
-def dict_rbind(df, new_names):
+def dict_rbind(df: Dict[Tuple[str], pd.DataFrame], new_names: List[str]) -> pd.DataFrame:
+    """Rowwise concatenation of a dictionary of DataFrames.
+    
+    New columns are created using the keys.
+
+    Args:
+        df: dictionray with tuples of strings for keys and dataframes for values.
+        new_names: column names in the output for each item in the keys.
+
+    Returns:
+        Concatenated dataframe, with additional columns for each element in the key
+        tuples.
+    """
     out_df = pd.concat(df).reset_index()
     out_df = out_df.rename(
         columns={f"level_{i}" : x for i,x in enumerate(new_names)}
@@ -99,7 +111,7 @@ def append_sim_args(df, arg_dict):
     """
     return pd.concat([df, pd.DataFrame(arg_dict, index=df.index)], axis=1)
 
-def arrayidx2args(idx, arg_dict: Dict) -> Dict:
+def arrayidx2args(idx: int, arg_dict: Dict) -> Dict:
     
     arg_dict_lengths = {k : len(v) for k,v in arg_dict.items()}
     
@@ -128,10 +140,20 @@ def median_heuristic(x):
     return np.median(pdist(x, metric="sqeuclidean"))
 
 def optimise_gpr(model):
-    """Optimise a GP model using the L-BFGS."""
+    """Optimise a GP model using L-BFGS."""
     gpf.optimizers.Scipy().minimize(model.training_loss, variables=model.trainable_variables)
 
-def cluster_otus(tree_distances, dist_eps):
+def cluster_otus(tree_distances, dist_eps) -> pd.DataFrame:
+    """Assign OTUs to clusters based on their phylogenetic distances.
+    
+    Args:
+        tree_distances: pairwise distances between OTUs, taken from the phylogenetic
+            tree.
+        dist_eps: maximum distance for OTUs to be clustered together.
+
+    Returns:
+        DataFrame with each OTU and its assigned cluster.
+    """
     flat_tree_distances = DistanceMatrix(tree_distances).condensed_form()
     Z = linkage(flat_tree_distances, method="complete")
     cluster_labels = fcluster(Z, t=np.max(flat_tree_distances)*dist_eps, criterion="distance")
