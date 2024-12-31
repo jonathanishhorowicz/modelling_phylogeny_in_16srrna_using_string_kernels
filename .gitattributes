@@ -1,1 +1,2 @@
 results/gp_simulations/manuscript.zip filter=lfs diff=lfs merge=lfs -text
+data/string_q_matrices_fame__bacterial.zip filter=lfs diff=lfs merge=lfs -text
