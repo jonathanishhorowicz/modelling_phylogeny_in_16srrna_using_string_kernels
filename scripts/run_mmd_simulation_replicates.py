@@ -12,11 +12,12 @@ import re
 import os
 import sys
 from skbio import TreeNode
+from pathlib import Path
 
 import tensorflow_probability.python.distributions as tfd
 
 sys.path.append("../scripts")
-from data_loading_utils import load_otu_table, read_feather, load_string_kernels
+from data_loading_utils import load_otu_table, read_feather, load_string_kernel_Q_matrices
 from misc_utils import (
     rnegbinom, cluster_otus, arrayidx2args, dict_rbind,
     append_sim_args, uniform_zero_replacement, closure_df, clr_df
@@ -63,9 +64,7 @@ logger.info(arg_vals)
 
 DATASET = 'fame__bacterial'
 TRANSFORM = arg_vals['TRANSFORM']
-STRING_KERNEL_VAR = arg_vals['STRING_KERNEL_VAR']
 N_TOTAL = arg_vals['N_TOTAL']
-GROUP1_SIZE = arg_vals['GROUP1_SIZE']
 SAMPLE_READ_DISP = arg_vals['SAMPLE_READ_DISP']
 SEED_CHUNK = arg_vals['SEED_CHUNK']
 STRING_KERNEL_VAR = 1e-1
@@ -98,7 +97,6 @@ logger.info(f"Making save directory at {save_path}")
 os.makedirs(save_path, exist_ok=True)
 os.makedirs(os.path.join(save_path, "metadata"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "mmd_and_pvalues"), exist_ok=True)
-os.makedirs(os.path.join(save_path, "permuted_mmds"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "sampled_alphas"), exist_ok=True)
 
 # save settings
@@ -131,19 +129,19 @@ pd.DataFrame(
 
 # load OTU table
 data_dict = {}
-data_dict['X'] = load_otu_table(dataset=DATASET)
+data_dict['X'] = load_otu_table(Path("../data", f"otu_counts_{DATASET}.csv"))
 
 # tree
 tree = TreeNode.read(
-    os.path.join("../data/clean/formatted/trees", f"{DATASET}.tree"),
+    os.path.join("../data", f"{DATASET}.tree"),
     'newick',
     convert_underscores=False
 )
 data_dict['tree'] = tree
-data_dict['tree_dist'] = read_feather(os.path.join("../data/clean/formatted/tree_distances", f"{DATASET}.feather"))
+data_dict['tree_dist'] = read_feather(os.path.join("../data", f"{DATASET}_tree_distances.feather"))
 
 # DMN concentrations
-dmn_alphas = pd.read_csv(os.path.join("../data/clean/formatted/dmn_fits", f"alphas_{DATASET}.csv"))
+dmn_alphas = pd.read_csv(os.path.join("../data", f"dmn_alphas_{DATASET}.csv"))
 data_dict["alpha_mle"] = dmn_alphas
 
 # standardise OTU names
@@ -172,9 +170,9 @@ kernel_dict = {
 }
 
 # string kernels
-string_kernels = load_string_kernels(
+string_kernels = load_string_kernel_Q_matrices(
     DATASET,
-    save_path="../data/clean/formatted/Q_matrices_float64"
+    save_path=Path("../data", f"string_q_matrices_{DATASET}.zip")
 )
 string_kernels = pd.concat(
     [string_kernels[x] for x in ["spectrum", "mismatch", "gappy"]]

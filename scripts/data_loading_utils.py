@@ -6,6 +6,10 @@ import os
 import pandas as pd
 import datatable as dt
 from pathlib import Path
+import zipfile
+import tempfile
+from typing import Dict
+from contextlib import contextmanager
 
 import logging
 logging.basicConfig(
@@ -33,7 +37,7 @@ def read_feather(filepath: Path) -> pd.DataFrame:
         logger.warning("'rownames' not available for use as index")
         return out.set_index("C0")
 
-def load_otu_table(dataset, n_threads=1):
+def load_otu_table(path: Path, n_threads=1):
     """Load the OTU table for a given dataset.
 
     OTUs with zero counts are removed.
@@ -46,10 +50,7 @@ def load_otu_table(dataset, n_threads=1):
         pd.DataFrame: the OTU abundances (counts).
     """
     # load OTU abundances
-    x = dt.fread(
-        f"../data/clean/formatted/X/{dataset}.csv",
-        nthreads=n_threads
-    ).to_pandas()
+    x = dt.fread(path, nthreads=n_threads).to_pandas()
     x.C0 = x.C0.astype(str)
     x = x.set_index("C0")
     x.index.rename("sample_id", inplace=True)
@@ -65,15 +66,39 @@ def load_otu_table(dataset, n_threads=1):
     return x.sort_index()
 
 def parse_stringkernel_name(x):
-    return dict([xx.split("__", 1) for xx in x.replace(".feather", "").replace("fame__", "fame_").split("____")]) 
+    return dict([xx.split("__", 1) for xx in x.replace(".feather", "").replace("fame__", "fame_").split("____")])
 
-def load_string_kernels(base_dataset, save_path="../data/clean/formatted/pre_computed_K"):
+@contextmanager
+def _open_possibly_zipped_directory(save_path: Path):
+    if save_path.suffix != '.zip':
+        yield Path(save_path)
+
+    else:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with zipfile.ZipFile(save_path) as archive:
+                archive.extractall(tmp_dir)
+            # we assume that a directory containing all the Q-matrices has been
+            # zipped so we skip the top directory
+            yield Path(tmp_dir, os.listdir(tmp_dir)[0])
+        
+
+def load_string_kernel_Q_matrices(base_dataset: str, save_path: Path) -> Dict[str, pd.DataFrame]:
+    """Load pre-computed string kernel Q matrices. Each string kernel (a single variant and its 
+    hyperparameters) are loaded from a feather file in the supplied directory (or zipfile). 
+    
+    Args:
+        base_dataset: a string containing 'fame' (used in the simulation studies) or 'ravel' (used
+            in the real host prediction task).
+        save_path: path to directory containing the string kernel Q-matrices as .feather files.
+
+    Returns:
+        Dictionary where keys are 'spectrum', 'gappy', 'mismatch' and the values are a dataframe where each row
+        contains a single set of hyperparameter values and the corresponding Q matrix.
+    """
     
     logger.debug(f"Loading string kernels for {base_dataset}")
     
-    if "CelticFire" in base_dataset or "Busselton" in base_dataset:
-        file_key = "buscf"
-    elif "fame" in base_dataset:
+    if "fame" in base_dataset:
         file_key = base_dataset
     elif "ravel" in base_dataset:
         file_key = "ravel"
@@ -82,27 +107,26 @@ def load_string_kernels(base_dataset, save_path="../data/clean/formatted/pre_com
         return None
     
     logger.debug(f"file key: {file_key}")
-    
-    # load files containing spectrum kernels for these OTUs
-    kernel_files = [
-        f for f in os.listdir(save_path)
-        if os.path.isfile(os.path.join(save_path, f))
-    ]
-    kernel_files = [f for f in kernel_files if file_key in f and ".feather" in f]
-    
-    logger.debug(f"Found {len(kernel_files)} string kernel files")
 
-    loaded_kernels = []
-    for i, f in enumerate(kernel_files):
-        logger.debug(f"Loading kernel {i} of {len(kernel_files)}")
-        Q = read_feather(os.path.join(save_path, f))
-        if not Q.columns.equals(Q.index):
-            logger.warning(f"Columns and index don't match for {kernel_files[k]}")
-            continue
-        loaded_kernels.append(
-            dict({'Q' : Q.astype(float)}, **parse_stringkernel_name(f))
-        )
-    logger.info(f"Loaded {len(loaded_kernels)} spectrum kernels")
+    with _open_possibly_zipped_directory(save_path) as kernel_file_path:
+        kernel_files = [p for p in kernel_file_path.glob('*.feather')]
+
+        if not kernel_files:
+            raise ValueError('Zero kernel Q matrices found!')
+        
+        logger.info(f"Found {len(kernel_files)} string kernel files")
+
+        loaded_kernels = []
+        for i, p in enumerate(kernel_files):
+            logger.debug(f"Loading kernel {i} of {len(kernel_files)}")
+            Q = read_feather(p)
+            if not Q.columns.equals(Q.index):
+                logger.warning(f"Columns and index don't match for {p}")
+                continue
+            loaded_kernels.append(
+                dict({'Q' : Q.astype(float)}, **parse_stringkernel_name(p.name))
+            )
+        logger.info(f"Loaded {len(loaded_kernels)} string kernel Q matrices")
     
     kernel_df = pd.DataFrame([{k : v for k,v in x.items() if k!='Q'} for x in loaded_kernels])
     kernel_df["Q"] = [x['Q'] for x in loaded_kernels]
