@@ -14,7 +14,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import tensorflow as tf
 import gpflow as gpf
 from gpflow.kernels import Linear, RBF, Matern32
-from gpflow.utilities import parameter_dict
 
 import sys
 sys.path.append("../scripts")
@@ -55,7 +54,7 @@ otu_names = asv_table.columns
 
 string_kernels = load_string_kernel_Q_matrices(
     "ravel",
-    save_path=Path("../data/ravel_stringkernels")
+    save_path=Path("../data/string_q_matrices_ravel.zip")
 )
 
 string_kernels = pd.concat(
@@ -262,10 +261,6 @@ N_CV_FOLDS = 10
 cv_splitter = KFold(n_splits=N_CV_FOLDS, shuffle=True)
 
 model_evals = {}
-preds_and_labels = {}
-model_hparams = {}
-string_lmls = {}
-best_string_hparams = {}
 
 for phenotype in ["Var"]:
     tf.keras.backend.clear_session()
@@ -326,20 +321,7 @@ for phenotype in ["Var"]:
 
             # store relevant probability density results
             model_evals[(phenotype, fold_idx, kernel_name)] = evaluate_model(mod, xx_test, y_test)
-            model_hparams[(phenotype, fold_idx, kernel_name)] = {
-                k : v.numpy() for k,v in parameter_dict(mod).items()
-            }
-            if kernel_name=="string":
-                logger.info(f"best_hparams: {best_hparams}")
-                best_string_hparams[(phenotype, fold_idx, kernel_name)] = pd.DataFrame({'kernel_name' : best_hparams}, index=[0])
-                string_lmls[(phenotype, fold_idx, kernel_name)] = lml_df
 
-            # save model predictions and labels
-            scatterplot_data = get_scatterplot_data(
-                mod,
-                {'train' : (xx_train, y_train), 'test' : (xx_test, y_test)}
-            )
-            preds_and_labels[(phenotype, fold_idx, kernel_name)] = scatterplot_data
 
 ##############################################################################
 ##############################################################################
