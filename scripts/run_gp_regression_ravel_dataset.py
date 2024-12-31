@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from sklearn.model_selection import  KFold
 from sklearn.utils.multiclass import type_of_target
@@ -25,7 +26,6 @@ from misc_utils import (
 )
 from data_loading_utils import load_string_kernel_Q_matrices
 
-
 import logging
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -37,8 +37,8 @@ logging.getLogger("utils").setLevel('INFO')
 
 
 # load ASV table and phenotypes
-asv_table = pd.read_csv("../data/clean/ravel/asv_table.csv").set_index("sample_id")
-phenotypes = pd.read_csv("../data/clean/ravel/phenotypes.csv").set_index("#SampleID")
+asv_table = pd.read_csv("../data/ravel_asv_table.csv").set_index("sample_id")
+phenotypes = pd.read_csv("../data/ravel_phenotypes.csv").set_index("#SampleID")
 common_samples = np.intersect1d(asv_table.index, phenotypes.index)
 
 asv_table = asv_table.loc[common_samples,:]
@@ -48,7 +48,6 @@ asv_table = remove_rare_otus(asv_table, 0.0)
 
 assert np.all(np.isnan(asv_table).sum()==0)
 assert np.all(np.isnan(phenotypes).sum()==0)
-asv_table.shape
 
 ### load string kernels
 kernel_dict = {}
@@ -56,7 +55,7 @@ otu_names = asv_table.columns
 
 string_kernels = load_string_kernel_Q_matrices(
     "ravel",
-    save_path="../data/clean/formatted/ravel_stringkernels"
+    save_path=Path("../data/ravel_stringkernels")
 )
 
 string_kernels = pd.concat(
@@ -165,8 +164,6 @@ def fit_string_gpmod(
     X, y,
     variance, noise_variance, opt,
     kernel_df, included_otus,
-    # param_limits={},
-    forceQPD=False,
     **kwargs):
     
     logger.debug(f"String kernel model selection with {kernel_df.shape[0]} candidate kernels")
@@ -178,8 +175,8 @@ def fit_string_gpmod(
                 X, y,
                 kernel_maker=lambda: StringKernel(
                     df_row.Q.loc[included_otus,included_otus].to_numpy(),
-                    variance=variance,
-                    forceQPD=forceQPD),
+                    variance=variance
+                ),
                 noise_variance=gpf.Parameter(
                     noise_variance,
                     transform=gpf.utilities.positive(NOISE_VAR_LOWER_LIM)
@@ -220,7 +217,8 @@ model_fit_fns = {
         lambda: Linear(variance=SIGNAL_VAR_STARTING_GUESS),
         NOISE_VAR_STARTING_GUESS,
         OPT,
-        variance_lowerlim=SIGNAL_VAR_LOWER_LIM),
+        variance_lowerlim=SIGNAL_VAR_LOWER_LIM
+    ),
     'rbf' : lambda X,y: fit_generic_gpmod(
         X, y,
         lambda: RBF(
@@ -229,7 +227,8 @@ model_fit_fns = {
         ),
         NOISE_VAR_STARTING_GUESS,
         OPT,
-        variance_lowerlim=SIGNAL_VAR_LOWER_LIM),
+        variance_lowerlim=SIGNAL_VAR_LOWER_LIM
+    ),
     'matern32' : lambda X,y: fit_generic_gpmod(
         X, y,
         lambda: Matern32(
@@ -238,7 +237,8 @@ model_fit_fns = {
         ),
         NOISE_VAR_STARTING_GUESS,
         OPT,
-        variance_lowerlim=SIGNAL_VAR_LOWER_LIM),
+        variance_lowerlim=SIGNAL_VAR_LOWER_LIM
+    ),
     'string' : lambda X,y: fit_string_gpmod(
         X, y,
         SIGNAL_VAR_STARTING_GUESS,
@@ -246,7 +246,8 @@ model_fit_fns = {
         OPT,
         string_kernels,
         otu_names,
-        variance_lowerlim=SIGNAL_VAR_LOWER_LIM)
+        variance_lowerlim=SIGNAL_VAR_LOWER_LIM
+    )
 }
 
 #######################################################################################################################
@@ -352,7 +353,7 @@ all_model_evals = pd.concat(
 ).reset_index(drop=True)
 
 all_model_evals.to_csv(
-    "../results/real_data/gpr/ravel_model_evals_tenfold.csv",
+    "../results/ravel_gpr_model_evals.csv",
     index=False
 )
 
