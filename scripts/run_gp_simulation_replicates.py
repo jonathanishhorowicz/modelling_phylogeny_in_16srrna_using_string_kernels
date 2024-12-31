@@ -5,6 +5,7 @@ import re
 from sklearn.model_selection import train_test_split
 from sklearn.utils.multiclass import type_of_target
 from skbio import TreeNode
+from pathlib import Path
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -18,7 +19,7 @@ from gpflow.utilities import parameter_dict
 
 import sys
 sys.path.append("../scripts")
-from data_loading_utils import load_otu_table, load_string_kernels, read_feather
+from data_loading_utils import load_otu_table, load_string_kernel_Q_matrices, read_feather
 from kernel_classes import StringKernel
 from misc_utils import (
     cluster_otus, closure_df, dict_rbind, append_sim_args,
@@ -150,19 +151,19 @@ tf.random.set_seed(tf_seed)
 
 # load OTU table
 data_dict = {}
-data_dict['X'] = load_otu_table(dataset=DATASET)
+data_dict['X'] = load_otu_table(Path("../data", f"otu_counts_{DATASET}.csv"))
 
-# tree
+# phylogenetic tree
 tree = TreeNode.read(
-    os.path.join("../data/clean/formatted/trees", f"{DATASET}.tree"),
+    os.path.join("../data", f"{DATASET}.tree"),
     'newick',
     convert_underscores=False
 )
 data_dict['tree'] = tree
-data_dict['tree_dist'] = read_feather(os.path.join("../data/clean/formatted/tree_distances", f"{DATASET}.feather"))
+data_dict['tree_dist'] = read_feather(os.path.join("../data", f"{DATASET}_tree_distances.feather"))
 
 # DMN concentrations
-dmn_alphas = pd.read_csv(os.path.join("../data/clean/formatted/dmn_fits", f"alphas_{DATASET}.csv"))
+dmn_alphas = pd.read_csv(os.path.join("../data", f"dmn_alphas_{DATASET}.csv"))
 data_dict["alpha_mle"] = dmn_alphas
 
 # standardise OTU names
@@ -185,9 +186,9 @@ data_dict['alpha_mle'] = data_dict['alpha_mle'].sort_values("OTU").reset_index(d
 kernel_dict = {}
 
 # string kernels
-string_kernels = load_string_kernels(
+string_kernels = load_string_kernel_Q_matrices(
     DATASET,
-    save_path="../data/clean/formatted/Q_matrices_float64"
+    save_path=Path("../data", f"string_q_matrices_{DATASET}.zip")
 )
 string_kernels = pd.concat(
     [string_kernels[x] for x in ["spectrum", "mismatch", "gappy"]]

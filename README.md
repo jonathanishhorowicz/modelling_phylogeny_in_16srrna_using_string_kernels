@@ -1,8 +1,17 @@
 # Modelling phylogeny in 16S rRNA gene sequencing datasets using string kernels
 
-# Running the code
+# Repo structure
 
-## General information
+* `data`: input data files needed to generate the results in the paper, e.g. OTU counts, phylogenetic trees, string kernel otu-wise similarity matrices (called $Q$ in the paper), etc.
+* `results`: output files used to create the figures in the paper.
+	- `gp_simulations`
+	- `mmd_simulations`
+	- `host_trait_prediction`
+* `run`: runner (shell) scripts for the three sets of results.
+* `scripts`: python scripts for the two sets of simulations and the real data results.
+
+
+# Running the code
 
 ### TODO: conda environment setup
 
@@ -82,5 +91,5 @@ Rscript ../scripts/plotting/gp_host_trait_sim_plots.R ../results/gp_simulations/
 ```
 
 
-## Real data results (Figure 10)
+## Real data results (Figure 9)
 
