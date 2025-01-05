@@ -14,7 +14,7 @@
 To install all requirements, from this directory run
 
 ```sh
-./build_environments.sh
+./build_environment.sh
 ```
 
 This will create a Python 3.8 conda environment named `stringphylo`, with all the required packages.
