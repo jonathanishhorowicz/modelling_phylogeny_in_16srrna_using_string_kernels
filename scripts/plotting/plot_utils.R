@@ -4,6 +4,7 @@ library(knitr)
 
 cropped_ggsave <- function(save_path, plot=last_plot(), ...) {
   # save a plot then remove any surrounding whitespace
+  cat('Saving plot to ', save_path, '\n')
   ggsave(save_path, plot=plot, ...)
   plot_crop(save_path)
 }
