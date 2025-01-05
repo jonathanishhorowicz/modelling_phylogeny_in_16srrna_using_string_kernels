@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import random
 from pathlib import Path
 
 from sklearn.model_selection import  KFold
@@ -33,7 +34,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel('DEBUG')
 logging.getLogger("utils").setLevel('INFO')
-
 
 # load ASV table and phenotypes
 asv_table = pd.read_csv("../data/ravel_asv_table.csv").set_index("sample_id")
@@ -83,12 +83,11 @@ string_kernels.Q = new_q
 #######################################################################################################################
 
 
-PARAM_LIMITS = {}
 OPT = True
 NOISE_VAR_STARTING_GUESS = 1.0
 SIGNAL_VAR_STARTING_GUESS = 1.0 
-SIGNAL_VAR_LOWER_LIM = 0.0
-NOISE_VAR_LOWER_LIM = 0.0
+SIGNAL_VAR_LOWER_LIM = 0.00
+NOISE_VAR_LOWER_LIM = 0.00
 
 def evaluate_model(mod, X_test, y_test):
     lml = mod.log_posterior_density().numpy()
@@ -218,26 +217,6 @@ model_fit_fns = {
         OPT,
         variance_lowerlim=SIGNAL_VAR_LOWER_LIM
     ),
-    'rbf' : lambda X,y: fit_generic_gpmod(
-        X, y,
-        lambda: RBF(
-            variance=SIGNAL_VAR_STARTING_GUESS,
-            lengthscales=median_heuristic(X)
-        ),
-        NOISE_VAR_STARTING_GUESS,
-        OPT,
-        variance_lowerlim=SIGNAL_VAR_LOWER_LIM
-    ),
-    'matern32' : lambda X,y: fit_generic_gpmod(
-        X, y,
-        lambda: Matern32(
-            variance=SIGNAL_VAR_STARTING_GUESS,
-            lengthscales=median_heuristic(X)
-        ),
-        NOISE_VAR_STARTING_GUESS,
-        OPT,
-        variance_lowerlim=SIGNAL_VAR_LOWER_LIM
-    ),
     'string' : lambda X,y: fit_string_gpmod(
         X, y,
         SIGNAL_VAR_STARTING_GUESS,
@@ -255,6 +234,12 @@ model_fit_fns = {
 #######################################################################################################################
 # run experiments
 #######################################################################################################################
+
+# set pRNG seed
+SEED = 12345
+tf.random.set_seed(SEED)
+random.seed(SEED)
+np.random.seed(SEED)
 
 N_CV_FOLDS = 10
 
@@ -295,13 +280,8 @@ for phenotype in ["Var"]:
         for kernel_name, kernel_fit_fn in model_fit_fns.items():
             logger.info(f"kernel_name: {kernel_name}")
 
-            # rescale X if using stationary kernel
-            if bool(re.match("matern|rbf", kernel_name)):
-                xx_train = X_train_
-                xx_test = X_test_
-            else:
-                xx_train = X_train
-                xx_test = X_test
+            xx_train = X_train
+            xx_test = X_test
 
             # fit the model
             try: 
@@ -335,7 +315,7 @@ all_model_evals = pd.concat(
 ).reset_index(drop=True)
 
 all_model_evals.to_csv(
-    "../results/ravel_gpr_model_evals.csv",
+    "../results/ravel_gpr_model_evals_3.csv",
     index=False
 )
 
