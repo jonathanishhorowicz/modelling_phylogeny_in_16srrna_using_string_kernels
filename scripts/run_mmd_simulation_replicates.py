@@ -92,12 +92,12 @@ PBS_ROOT_ID = re.split("\\[|\\.", PBS_JOBID)[0]
 logger.info(f"PBS_ROOT_ID: {PBS_ROOT_ID}")
 save_path = save_path = os.path.join(
     "../results/mmd_simulations",
-    PBS_ROOT_ID)
+    PBS_ROOT_ID
+)
 logger.info(f"Making save directory at {save_path}")
 os.makedirs(save_path, exist_ok=True)
 os.makedirs(os.path.join(save_path, "metadata"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "mmd_and_pvalues"), exist_ok=True)
-os.makedirs(os.path.join(save_path, "sampled_alphas"), exist_ok=True)
 
 # save settings
 settings = {

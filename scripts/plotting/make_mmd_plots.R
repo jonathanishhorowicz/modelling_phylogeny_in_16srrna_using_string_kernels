@@ -5,7 +5,6 @@ library(tibble)
 library(stringr)
 library(forcats)
 library(binom)
-
 library(ggplot2)
 theme_set(theme_linedraw(base_size=12))
 library(ggpubr)
@@ -34,13 +33,6 @@ get_kernel_type <- function(kernel) {
   return(prior_types[ key ])
 }
 
-get_t1err_confint <- function(nominal_sig, ci, n) {
-  # Calculate the confidence interval around a nominal significance level using
-  # the binomial proportion CI.
-  df_ci <- binom.confint(nominal_sig * n, n, ci, method='exact')
-  return(tibble(PointEst=nominal_sig, Lower=df_ci$lower, Upper=df_ci$upper))
-}
-
 ########################################################################
 ########################################################################
 
@@ -52,7 +44,16 @@ get_t1err_confint <- function(nominal_sig, ci, n) {
 # Read command line argument (path to MMD simulation results)
 args <- commandArgs(trailingOnly=TRUE)
 save_path <- args[[1]]
+# save_path <- '../results/mmd_simulations/manuscript_test'
 cat('Reading MMD simulation results from ', save_path, '\n')
+
+# if input is zipfile then unzip to temporary location and point script there
+if(tools::file_ext(save_path) == 'zip') {
+  cat('Input is a zip file - extracting to temporary location\n')
+  tmp_dir <- file.path(tempdir(), 'gp_sim_plots')
+  unzip(save_path, exdir=tmp_dir)
+  save_path <- list.files(tmp_dir, full.names = TRUE)[[1]] # skip parent directory
+}
 
 #
 # Type I error plots
@@ -64,7 +65,8 @@ mmd_p_value_files <- lapply(
 ) %>% unlist()
 
 mmd_p_values <- lapply(mmd_p_value_files, fread) %>%
-  rbindlist()
+  rbindlist() %>%
+  as_tibble()
 
 # nominal significance level and its CI
 alpha_level <- 0.1
@@ -73,18 +75,17 @@ alpha_level_interval_size <- 0.95
 # H0 rejection rate
 t1_errors  <- mmd_p_values %>%
   group_by_at(setdiff(colnames(.), c("SEED_CHUNK", "alpha_rep", "p_value", "mmd_emp"))) %>%
-  summarise(n_reject=sum(p_value<alpha_level)/length(p_value))
+  summarise(n_reject=sum(p_value<alpha_level)/length(p_value), n_replicates=n())
 
-# binomial proportion confidence intervals
-t1_conf_int <- mmd_p_values %>%
-  group_by_at(setdiff(colnames(mmd_p_values), c("SEED_CHUNK", "alpha_rep", "p_value", "mmd_emp"))) %>%
-  summarise(get_t1err_confint(alpha_level, alpha_level_interval_size, n())) %>%
-  ungroup()
-
-stopifnot(length(unique(t1_conf_int$Lower))==1)
-stopifnot(length(unique(t1_conf_int$Upper))==1)
-t1err_lower <- min(t1_conf_int$Lower)
-t1err_upper <- max(t1_conf_int$Upper)
+# all the different simulation parameters should have the same
+# confidence interval on the H0 rejection rate, given by the exact binomial
+# proportion interval
+n_replicates <- unique(t1_errors$n_replicates)
+stopifnot(length(n_replicates) == 1)
+n_replicates <- n_replicates[[1]]
+df_ci <- binom.confint(alpha_level * n_replicates, n_replicates, alpha_level_interval_size, method='exact')
+t1err_lower <- min(df_ci$lower)
+t1err_upper <- max(df_ci$upper)
 
 # Type I error for variable n
 t1_errors_plot <- t1_errors %>%
@@ -163,9 +164,9 @@ plotdata2 <- t1_errors_plot %>%
   ) 
 
 
-make_h0_rejection_plot <- function(plot_data) {
+make_h0_rejection_plot <- function(plot_data, colour_aes) {
   plot_data %>%
-    ggplot(aes(x=N_TOTAL/2, y=n_reject, colour=k)) +
+    ggplot(aes(x=N_TOTAL/2, y=n_reject, colour=!!sym(colour_aes))) +
     geom_line(aes(group=kernel)) +
     geom_point(size=3) +
     facet_rep_grid(
@@ -189,19 +190,20 @@ make_h0_rejection_plot <- function(plot_data) {
     scale_color_manual(values=scales::hue_pal()(4), na.value="black") +
     ylab(expression(paste(H[0], " rejection rate"))) +
     xlab("Group size") +
-    get_plot_theme()
+    get_plot_theme() +
+    theme(panel.spacing.x=unit(0.6, 'lines'))
 }
 
 # Spectrum kernels
 plotdata2 %>%
   filter(facet_row_name=="Spectrum") %>%
   mutate(k=factor(k, levels=plotdata2$k %>% as.integer() %>% unique() %>% sort())) %>%
-  make_h0_rejection_plot() +
+  make_h0_rejection_plot('k') +
   labs(colour="k-mer length")
 
 cropped_ggsave(
   "../plots/mmd_twosample_test_string.pdf",
-  height=5,
+  height=4,
   width=12
 )
 
@@ -212,12 +214,12 @@ plotdata2 %>%
     kernel_name,
     "unweighted-unifrac"="Unweighted",
     "weighted-unifrac"="Weighted")) %>%
-  make_h0_rejection_plot() +
+  make_h0_rejection_plot('kernel_name') +
   labs(colour="UniFrac variant")
   
 cropped_ggsave(
   "../plots/mmd_twosample_test_unifrac.pdf",
-  height=5,
+  height=4,
   width=12
 )
 
@@ -228,40 +230,17 @@ plotdata2 %>%
     kernel_name,
     "rbf-rescale"="RBF",
     "gram"="Linear")) %>%
-  make_h0_rejection_plot() +
+  make_h0_rejection_plot('kernel_name') +
   labs(colour="Kernel type")
   
 cropped_ggsave(
   "../plots/mmd_twosample_test_abundanceonly.pdf",
-  height=5,
+  height=4,
   width=12
 )
 
 
-# supplementary text plot
-hparam_name <- c(gappy="g=", mismatch="m=")
-
-supp_fig_H0_plotdata <- t1_errors_plot %>%
-  filter(!grepl("rbf|gram|matern", kernel)) %>%
-  mutate(
-    facet_title=sprintf("%s (%s%s)", kernel_name, hparam_name[kernel_name], m),
-    facet_title=if_else(grepl("spectrum|unifrac", facet_title),
-                        str_remove(facet_title, "\\(NANA\\)"),
-                        facet_title),
-    facet_title=str_remove(facet_title, "unweighted-|weighted-")
-  ) 
-
-plt_panel_data <- supp_fig_H0_plotdata %>%
-  filter(SAMPLE_READ_DISP==10, otu_perm_method=="phylo") %>%
-  right_join(
-    tibble(
-      kernel_name=c("gappy", "mismatch", "spectrum", "unweighted-unifrac", "weighted-unifrac"),
-      TRANSFORM=c("clr", "clr", "clr", "log1p", "log1p")
-    )
-  ) %>%
-  mutate(facet_title=trimws(facet_title)) %>%
-  filter(facet_title!="unifrac") 
-
+# figure 6A
 mmd_p_values %>%
   right_join(
     tibble(
@@ -297,6 +276,7 @@ mmd_p_values %>%
   geom_hline(yintercept=1, colour="red") +
   coord_cartesian(ylim=c(0,1.5)) +
   get_plot_theme()
+
 cropped_ggsave(
   "../plots/mmd_var_eps_ratio.pdf",
   width=12, height=4
@@ -336,11 +316,11 @@ mmd_p_values %>%
                     levels=c(0, 1e-3, 1e-2, 1e-1, 1),
                     labels=format(c(0, 1e-3, 1e-2, 1e-1, 1), scienfitic=TRUE))) %>%
   ggplot(aes(x=eps, y=median_mmd,
-              colour=otu_perm_method, group=interaction(otu_perm_method))) +
+             colour=otu_perm_method, group=interaction(otu_perm_method))) +
   geom_line() +
   geom_point() +
   geom_ribbon(aes(ymin=lower_lim, ymax=upper_lim,
-                  fill=interaction(otu_perm_method)), alpha=0.5) +
+                  fill=interaction(otu_perm_method)), alpha=0.4) +
   facet_rep_wrap(~kernel, scales="free_y", nrow=1) +
   get_plot_theme() +
   theme(
