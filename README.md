@@ -7,10 +7,28 @@
 * `run`: runner (shell) scripts for the three sets of results.
 * `scripts`: python scripts for the two sets of simulations and the real data results.
 
-
 # Running the code
 
-### TODO: conda environment setup
+## Requirements
+
+To install all requirements, from this directory run
+
+```sh
+./build_environment.sh
+```
+
+This will create a Python 3.8 conda environment named `stringphylo`, with all the required packages.
+
+The analysis pipelines are run in Python and the main requirements are
+
+* Tensorflow 2.13
+* Tensorflow Probability 0.21
+* Scikit-bio 0.5
+* Scikit-learn 1.3
+
+Plots are generated using R 4.1. For the list of R packages/versions see `scripts/plotting/install_requirements.sh`. The R dependencies take about 20 minutes to install.
+
+## Running the analysis scripts
 
 The `run` directory is the working directory for running all Python and R scripts (found in `scripts`). Python scripts are used to run simulations (e.g. generating OTU counts, computing kernels, MMD values are fitting GPs) and R scripts are used for making plots.
 
@@ -19,7 +37,7 @@ The code is designed to be run on a high-performance cluster using array jobs. E
 ```python
 {
     'N_TOTAL' : [50, 100, 200, 400], # total number of samples
-    'SAMPLE_READ_DISP' : [3.0, 10.0, 30.0], # Negative binomial dispersion
+    'SAMPLE_READ_DISP' : [3.0, 10.0, 30.0] # Negative binomial dispersion parameter
 }
 ```
 
@@ -87,6 +105,7 @@ cd run
 Rscript ../scripts/plotting/gp_host_trait_sim_plots.R ../results/gp_simulations/manuscript.zip
 ```
 
+This will generate the plots from the pre-computed simulation results.
 
 ## Real data results (Figure 9)
 
