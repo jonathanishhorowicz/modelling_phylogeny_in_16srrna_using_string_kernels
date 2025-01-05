@@ -4,9 +4,6 @@
 
 * `data`: input data files needed to generate the results in the paper, e.g. OTU counts, phylogenetic trees, string kernel otu-wise similarity matrices (called $Q$ in the paper), etc.
 * `results`: output files used to create the figures in the paper.
-	- `gp_simulations`
-	- `mmd_simulations`
-	- `host_trait_prediction`
 * `run`: runner (shell) scripts for the three sets of results.
 * `scripts`: python scripts for the two sets of simulations and the real data results.
 
