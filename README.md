@@ -83,7 +83,7 @@ Rscript ../scripts/plotting/make_mmd_plots.R path_to_mmd_sim_results
 
 ## GP simulations (Figures 7 and 8)
 
-To produce Figures 7 and 8 run
+To produce Figures 7 and 8, from this directory run
 
 ```sh
 cd run
@@ -93,15 +93,15 @@ Rscript ../scripts/plotting/gp_host_trait_sim_plots.R ../results/gp_simulations/
 
 ## Real data results (Figure 9)
 
-To run the analysis run 
+To run the analysis, from this directory run 
 
 ```sh
 cd run
-python ../scripts/run_gp_regression_ravel_dataset.py
+./run_ravel_gp_regression.sh
 ```
 
-Then to generate the plots run 
+This wlil generate `results/ravel_gpr_model_evals.csv`, which contains the log-marginal likelihoods and log-predictive densities across the ten nseted cross-validation outer folds. To create Figure 10 then run
 
 ```sh
-Rscript ...
+Rscript ../scripts/plotting/gp_regression_ravel_plots.R
 ```
