@@ -4,9 +4,6 @@
 
 * `data`: input data files needed to generate the results in the paper, e.g. OTU counts, phylogenetic trees, string kernel otu-wise similarity matrices (called $Q$ in the paper), etc.
 * `results`: output files used to create the figures in the paper.
-	- `gp_simulations`
-	- `mmd_simulations`
-	- `host_trait_prediction`
 * `run`: runner (shell) scripts for the three sets of results.
 * `scripts`: python scripts for the two sets of simulations and the real data results.
 
@@ -83,7 +80,7 @@ Rscript ../scripts/plotting/make_mmd_plots.R path_to_mmd_sim_results
 
 ## GP simulations (Figures 7 and 8)
 
-To produce Figures 7 and 8 run
+To produce Figures 7 and 8, from this directory run
 
 ```sh
 cd run
@@ -93,3 +90,15 @@ Rscript ../scripts/plotting/gp_host_trait_sim_plots.R ../results/gp_simulations/
 
 ## Real data results (Figure 9)
 
+To run the analysis, from this directory run 
+
+```sh
+cd run
+./run_ravel_gp_regression.sh
+```
+
+This wlil generate `results/ravel_gpr_model_evals.csv`, which contains the log-marginal likelihoods and log-predictive densities across the ten nseted cross-validation outer folds. To create Figure 10 then run
+
+```sh
+Rscript ../scripts/plotting/gp_regression_ravel_plots.R
+```

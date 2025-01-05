@@ -16,7 +16,6 @@ source("../scripts/plotting/plot_utils.R")
 # Read command line argument (path to GP host trait prediction simulation results)
 args <- commandArgs(trailingOnly=TRUE)
 save_path <- args[[1]]
-save_path <- '../results/gp_simulations/manuscript.zip'
 cat('Reading GP simulation results from ', save_path, '\n')
 
 # if input is zipfile then unzip to temporary location and point script there
@@ -32,11 +31,6 @@ if(tools::file_ext(save_path) == 'zip') {
 save_paths <- c(
   file.path(save_path, 'classification'),
   file.path(save_path, 'regression')
-)
-
-pretty_kernel_names <- c(
-  string="String",
-  linear="Linear"
 )
 
 all_dirs <- lapply(
@@ -146,8 +140,6 @@ for(plotted_quantity in c("lml", "lpd")) {
 ###############################################################################################################
 ###############################################################################################################
 
-
-
 ###############################################################################################################
 # Plot of median LML/ELBO dependence on the string kernel hyperparameters
 ###############################################################################################################
@@ -171,7 +163,7 @@ df_median_string_lmls <- df_string_lmls %>%
   group_by_at(
     setdiff(colnames(.), c('lml', 'rep', 'RESAMPLE_BATCH_INDEX', 'filename'))
   ) %>%
-  summarise(median_lml=median(lml), n_reps=n(), upper_lim=quantile(lml, 0.975), lower_lim=quantile(lml, 0.025)) %>%
+  summarise(median_lml=median(lml), n_reps=n()) %>%
   ungroup()
 
 make_kernel_label <- function(type, m) {
