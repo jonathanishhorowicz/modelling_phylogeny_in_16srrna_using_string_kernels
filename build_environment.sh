@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 echo 'Building conda environment "stringphylo"'
-conda create --name test2 python=3.8 --yes
-source activate test2
+conda create --name stringphylo python=3.8 --yes
+source activate stringphylo
 pip install \
     gpflow==2.9.2 \
     tensorflow-probability==0.21.0 \

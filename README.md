@@ -11,7 +11,13 @@
 
 ## Requirements
 
-The `build_environment.sh` script in the root directory creates a Python 3.8 conda environment with all the required package versions to generate the results in the paper.
+To install all requirements, from this directory run
+
+```sh
+./build_environments.sh
+```
+
+This will create a Python 3.8 conda environment named `stringphylo`, with all the required packages.
 
 The analysis pipelines are run in Python and the main requirements are
 
