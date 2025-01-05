@@ -16,8 +16,6 @@ source("../scripts/plotting/plot_utils.R")
 # Read command line argument (path to GP host trait prediction simulation results)
 args <- commandArgs(trailingOnly=TRUE)
 save_path <- args[[1]]
-save_path <- '../results/gp_simulations/manuscript.zip'
-save_path <- '../results/gp_simulations/manuscript'
 cat('Reading GP simulation results from ', save_path, '\n')
 
 # if input is zipfile then unzip to temporary location and point script there
