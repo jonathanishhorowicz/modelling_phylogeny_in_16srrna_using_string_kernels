@@ -7,7 +7,6 @@
 * `run`: runner (shell) scripts for the three sets of results.
 * `scripts`: python scripts for the two sets of simulations and the real data results.
 
-
 # Running the code
 
 ## Requirements
