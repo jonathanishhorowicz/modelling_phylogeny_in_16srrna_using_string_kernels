@@ -277,7 +277,6 @@ class_subplots <-
         strip.text=element_text(colour="black", size=12)
       )
   )
-class_subplots$plot[[1]]
 
 plt <- class_subplots$plot[[1]]
 
