@@ -24,7 +24,7 @@ The analysis pipelines are run in Python and the main requirements are
 
 Plots are generated using R 4.1. For the list of R packages/versions see `scripts/plotting/install_requirements.sh`.
 
-### TODO: conda environment setup
+## Running the analysis scripts
 
 The `run` directory is the working directory for running all Python and R scripts (found in `scripts`). Python scripts are used to run simulations (e.g. generating OTU counts, computing kernels, MMD values are fitting GPs) and R scripts are used for making plots.
 
