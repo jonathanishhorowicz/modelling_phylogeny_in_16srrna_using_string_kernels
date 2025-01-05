@@ -3,25 +3,24 @@ import pandas as pd
 import random
 from pathlib import Path
 
-from sklearn.model_selection import  KFold
+from sklearn.model_selection import KFold
 from sklearn.utils.multiclass import type_of_target
 from sklearn.base import BaseEstimator
-
-import re
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import tensorflow as tf
 import gpflow as gpf
-from gpflow.kernels import Linear, RBF, Matern32
+from gpflow.kernels import Linear
 
 import sys
 sys.path.append("../scripts")
 from kernel_classes import StringKernel
 from misc_utils import (
     closure_df,
-    safe_rescale, median_heuristic, optimise_gpr,
+    safe_rescale,
+    optimise_gpr,
     remove_rare_otus
 )
 from data_loading_utils import load_string_kernel_Q_matrices
