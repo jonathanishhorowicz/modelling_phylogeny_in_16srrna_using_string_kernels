@@ -10,6 +10,20 @@
 
 # Running the code
 
+## Requirements
+
+The `build_environment.sh` script in the root directory creates a Python 3.8 conda environment with all the required package versions to generate the results in the paper.
+
+The analysis pipelines are run in Python and the main requirements are
+
+* Python 3.8
+* Tensorflow 2.13
+* Tensorflow Probability 0.21
+* Scikit-bio 0.5
+* Scikit-learn 1.3
+
+Plots are generated using R 4.1. For the list of R packages/versions see `scripts/plotting/install_requirements.sh`.
+
 ### TODO: conda environment setup
 
 The `run` directory is the working directory for running all Python and R scripts (found in `scripts`). Python scripts are used to run simulations (e.g. generating OTU counts, computing kernels, MMD values are fitting GPs) and R scripts are used for making plots.
